@@ -365,7 +365,13 @@ Start:
 					if err == nil {
 						return
 					}
-					obj.errAppend(interfaces.FuncHighlightHelper(f, obj.Logf, err))
+					// Don't wrap context errors with source
+					// positions, they're shutdown signals.
+					if ctx.Err() != nil {
+						obj.errAppend(err)
+					} else {
+						obj.errAppend(interfaces.FuncHighlightHelper(f, obj.Logf, err))
+					}
 					obj.cancel() // error
 				}()
 				node.started = true

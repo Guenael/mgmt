@@ -161,6 +161,7 @@ var _ interfaces.BuildableFunc = &Func{} // ensure it meets this expectation
 // `Make` builder function to create the function implementation.
 type Func struct {
 	*docsUtil.Metadata
+	interfaces.Textarea
 	*WrappedFunc // *wrapped.Func as a type alias to pull in the base impl.
 
 	// Make is a build function to run after type unification. It will get

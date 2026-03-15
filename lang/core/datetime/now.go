@@ -50,6 +50,7 @@ func init() {
 
 // Now is a fact which returns the current date and time.
 type Now struct {
+	interfaces.Textarea
 	init *interfaces.Init
 }
 

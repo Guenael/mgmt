@@ -87,6 +87,7 @@ var _ interfaces.InferableFunc = &PrintfFunc{} // ensure it meets this expectati
 // we could expect the type signature to change, which is not allowed in our
 // statically typed language.
 type PrintfFunc struct {
+	interfaces.Textarea
 	Type *types.Type // final full type of our function
 
 	init *interfaces.Init
@@ -319,7 +320,8 @@ func (obj *PrintfFunc) Init(init *interfaces.Init) error {
 // function.
 func (obj *PrintfFunc) Copy() interfaces.Func {
 	return &PrintfFunc{
-		Type: obj.Type, // don't copy because we use this after unification
+		Textarea: obj.Textarea,
+		Type:     obj.Type, // don't copy because we use this after unification
 
 		init: obj.init, // likely gets overwritten anyways
 	}
