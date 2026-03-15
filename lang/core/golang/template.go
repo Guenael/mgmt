@@ -77,6 +77,7 @@ var _ interfaces.InferableFunc = &TemplateFunc{} // ensure it meets this expecta
 // TODO: We *might* need to add events for internal function changes over time,
 // but only if they are not pure. We currently only use simple, pure functions.
 type TemplateFunc struct {
+	interfaces.Textarea
 	// Type is the type of the input vars (2nd) arg if one is specified. Nil
 	// is the special undetermined value that is used before type is known.
 	Type *types.Type // type of vars
@@ -355,8 +356,9 @@ func (obj *TemplateFunc) convert(v types.Value) (interface{}, error) {
 // function.
 func (obj *TemplateFunc) Copy() interfaces.Func {
 	return &TemplateFunc{
-		Type:  obj.Type, // don't copy because we use this after unification
-		built: obj.built,
+		Textarea: obj.Textarea,
+		Type:     obj.Type, // don't copy because we use this after unification
+		built:    obj.built,
 
 		init: obj.init, // likely gets overwritten anyways
 	}

@@ -183,6 +183,7 @@ var _ interfaces.BuildableFunc = &Func{} // ensure it meets this expectation
 // function.
 type Func struct {
 	*docsUtil.Metadata
+	interfaces.Textarea
 	*WrappedFunc // *wrapped.Func as a type alias to pull in the base impl.
 
 	// Check is a check function to run after type unification. It will get

@@ -52,6 +52,7 @@ type Info struct {
 // It can be wrapped by other structs that support polymorphism in various ways.
 type Func struct {
 	//*docsUtil.Metadata // This should NOT happen here, the parents do it.
+	interfaces.Textarea
 
 	// Name is a unique string name for the function.
 	Name string

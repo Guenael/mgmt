@@ -35,6 +35,7 @@ import (
 	"strings"
 
 	"github.com/purpleidea/mgmt/util"
+	"github.com/purpleidea/mgmt/util/errwrap"
 )
 
 // Textarea stores the coordinates of a statement or expression in the form of a
@@ -63,6 +64,17 @@ type Textarea struct {
 
 	// Bug5819 works around issue https://github.com/golang/go/issues/5819
 	Bug5819 interface{} // XXX: workaround
+}
+
+// TextareaFunc is implemented by functions that can receive source position
+// info. The embedded Textarea struct satisfies this interface automatically.
+type TextareaFunc interface {
+	SetTextarea(Textarea)
+}
+
+// SetTextarea copies the source position from another Textarea.
+func (obj *Textarea) SetTextarea(t Textarea) {
+	*obj = t
 }
 
 // Setup is used during AST initialization in order to store in each AST node
@@ -209,4 +221,26 @@ func HighlightHelper(node Node, logf func(format string, v ...interface{}), err 
 		logf("%s: %s", err.Error(), highlight)
 	}
 	return fmt.Errorf("%s: %s", err.Error(), displayer.Byline())
+}
+
+// FuncHighlightHelper is similar to HighlightHelper, but it accepts any value
+// and checks for TextDisplayer at runtime. This is used in the DAGE engine to
+// wrap errors from function nodes that may or may not have source location info.
+func FuncHighlightHelper(f interface{}, logf func(format string, v ...interface{}), err error) error {
+	type isSetChecker interface {
+		IsSet() bool
+	}
+	if checker, ok := f.(isSetChecker); ok && !checker.IsSet() {
+		return err
+	}
+
+	displayer, ok := f.(TextDisplayer)
+	if !ok {
+		return err
+	}
+
+	if highlight := displayer.HighlightText(); highlight != "" {
+		logf("%s: %s", err.Error(), highlight)
+	}
+	return errwrap.Wrapf(err, "%s", displayer.Byline())
 }

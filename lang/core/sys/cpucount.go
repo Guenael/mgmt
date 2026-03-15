@@ -64,6 +64,7 @@ func init() {
 
 // CPUCount is a fact that returns the current CPU count.
 type CPUCount struct {
+	interfaces.Textarea
 	init   *interfaces.Init
 	result types.Value // last calculated output
 }
