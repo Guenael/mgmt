@@ -221,7 +221,7 @@ const yyEofCode = 1
 const yyErrCode = 2
 const yyInitialStackSize = 16
 
-//line parser/parser.y:1565
+//line parser/parser.y:1567
 
 // pos is a helper function used to track the position in the parser.
 func pos(y yyLexer, dollar yySymType) {
@@ -1966,6 +1966,7 @@ yydefault:
 				Args: yyDollar[3].exprs,
 				//Var: false, // default
 			}
+			locate(yylex, yyDollar[1], yyDollar[len(yyDollar)-1], call)
 			name := &ast.ExprStr{
 				V: yyDollar[1].str, // any constant, non-empty name
 			}
@@ -1983,7 +1984,7 @@ yydefault:
 		}
 	case 84:
 		yyDollar = yyS[yypt-2 : yypt+1]
-//line parser/parser.y:1049
+//line parser/parser.y:1050
 		{
 			// A "collect" stmt is exactly a regular "res" statement, except
 			// it has the boolean "Collect" field set to true, and it also
@@ -2011,6 +2012,7 @@ yydefault:
 					res.Name, // expr (hopefully one of those types)
 				},
 			}
+			locate(yylex, yyDollar[1], yyDollar[len(yyDollar)-1], call)
 			collect := &ast.StmtResCollect{ // special field
 				Kind:  kind, // might as well tell it directly
 				Value: call,
@@ -2020,7 +2022,7 @@ yydefault:
 		}
 	case 85:
 		yyDollar = yyS[yypt-5 : yypt+1]
-//line parser/parser.y:1103
+//line parser/parser.y:1105
 		{
 			yyVAL.stmt = &ast.StmtRes{
 				Kind:     yyDollar[1].str,
@@ -2031,70 +2033,70 @@ yydefault:
 		}
 	case 86:
 		yyDollar = yyS[yypt-0 : yypt+1]
-//line parser/parser.y:1114
+//line parser/parser.y:1116
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.resContents = []ast.StmtResContents{}
 		}
 	case 87:
 		yyDollar = yyS[yypt-2 : yypt+1]
-//line parser/parser.y:1119
+//line parser/parser.y:1121
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.resContents = append(yyDollar[1].resContents, yyDollar[2].resField)
 		}
 	case 88:
 		yyDollar = yyS[yypt-2 : yypt+1]
-//line parser/parser.y:1124
+//line parser/parser.y:1126
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.resContents = append(yyDollar[1].resContents, yyDollar[2].resField)
 		}
 	case 89:
 		yyDollar = yyS[yypt-2 : yypt+1]
-//line parser/parser.y:1129
+//line parser/parser.y:1131
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.resContents = append(yyDollar[1].resContents, yyDollar[2].resEdge)
 		}
 	case 90:
 		yyDollar = yyS[yypt-2 : yypt+1]
-//line parser/parser.y:1134
+//line parser/parser.y:1136
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.resContents = append(yyDollar[1].resContents, yyDollar[2].resEdge)
 		}
 	case 91:
 		yyDollar = yyS[yypt-2 : yypt+1]
-//line parser/parser.y:1139
+//line parser/parser.y:1141
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.resContents = append(yyDollar[1].resContents, yyDollar[2].resMeta)
 		}
 	case 92:
 		yyDollar = yyS[yypt-2 : yypt+1]
-//line parser/parser.y:1144
+//line parser/parser.y:1146
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.resContents = append(yyDollar[1].resContents, yyDollar[2].resMeta)
 		}
 	case 93:
 		yyDollar = yyS[yypt-2 : yypt+1]
-//line parser/parser.y:1149
+//line parser/parser.y:1151
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.resContents = append(yyDollar[1].resContents, yyDollar[2].resMeta)
 		}
 	case 94:
 		yyDollar = yyS[yypt-2 : yypt+1]
-//line parser/parser.y:1154
+//line parser/parser.y:1156
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.resContents = append(yyDollar[1].resContents, yyDollar[2].resMeta)
 		}
 	case 95:
 		yyDollar = yyS[yypt-4 : yypt+1]
-//line parser/parser.y:1161
+//line parser/parser.y:1163
 		{
 			yyVAL.resField = &ast.StmtResField{
 				Field: yyDollar[1].str,
@@ -2104,7 +2106,7 @@ yydefault:
 		}
 	case 96:
 		yyDollar = yyS[yypt-6 : yypt+1]
-//line parser/parser.y:1172
+//line parser/parser.y:1174
 		{
 			yyVAL.resField = &ast.StmtResField{
 				Field:     yyDollar[1].str,
@@ -2115,7 +2117,7 @@ yydefault:
 		}
 	case 97:
 		yyDollar = yyS[yypt-4 : yypt+1]
-//line parser/parser.y:1184
+//line parser/parser.y:1186
 		{
 			yyVAL.resEdge = &ast.StmtResEdge{
 				Property: yyDollar[1].str,
@@ -2125,7 +2127,7 @@ yydefault:
 		}
 	case 98:
 		yyDollar = yyS[yypt-6 : yypt+1]
-//line parser/parser.y:1195
+//line parser/parser.y:1197
 		{
 			yyVAL.resEdge = &ast.StmtResEdge{
 				Property:  yyDollar[1].str,
@@ -2136,7 +2138,7 @@ yydefault:
 		}
 	case 99:
 		yyDollar = yyS[yypt-6 : yypt+1]
-//line parser/parser.y:1207
+//line parser/parser.y:1209
 		{
 			if strings.ToLower(yyDollar[1].str) != strings.ToLower(ast.MetaField) {
 				// this will ultimately cause a parser error to occur...
@@ -2150,7 +2152,7 @@ yydefault:
 		}
 	case 100:
 		yyDollar = yyS[yypt-8 : yypt+1]
-//line parser/parser.y:1222
+//line parser/parser.y:1224
 		{
 			posLast(yylex, yyDollar) // our pos
 			if strings.ToLower(yyDollar[1].str) != strings.ToLower(ast.MetaField) {
@@ -2166,7 +2168,7 @@ yydefault:
 		}
 	case 101:
 		yyDollar = yyS[yypt-4 : yypt+1]
-//line parser/parser.y:1239
+//line parser/parser.y:1241
 		{
 			if strings.ToLower(yyDollar[1].str) != strings.ToLower(ast.MetaField) {
 				// this will ultimately cause a parser error to occur...
@@ -2180,7 +2182,7 @@ yydefault:
 		}
 	case 102:
 		yyDollar = yyS[yypt-6 : yypt+1]
-//line parser/parser.y:1254
+//line parser/parser.y:1256
 		{
 			if strings.ToLower(yyDollar[1].str) != strings.ToLower(ast.MetaField) {
 				// this will ultimately cause a parser error to occur...
@@ -2195,7 +2197,7 @@ yydefault:
 		}
 	case 103:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line parser/parser.y:1272
+//line parser/parser.y:1274
 		{
 			yyVAL.stmt = &ast.StmtEdge{
 				EdgeHalfList: yyDollar[1].edgeHalfList,
@@ -2205,7 +2207,7 @@ yydefault:
 		}
 	case 104:
 		yyDollar = yyS[yypt-3 : yypt+1]
-//line parser/parser.y:1281
+//line parser/parser.y:1283
 		{
 			yyVAL.stmt = &ast.StmtEdge{
 				EdgeHalfList: []*ast.StmtEdgeHalf{
@@ -2218,21 +2220,21 @@ yydefault:
 		}
 	case 105:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line parser/parser.y:1294
+//line parser/parser.y:1296
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.edgeHalfList = []*ast.StmtEdgeHalf{yyDollar[1].edgeHalf}
 		}
 	case 106:
 		yyDollar = yyS[yypt-3 : yypt+1]
-//line parser/parser.y:1299
+//line parser/parser.y:1301
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.edgeHalfList = append(yyDollar[1].edgeHalfList, yyDollar[3].edgeHalf)
 		}
 	case 107:
 		yyDollar = yyS[yypt-4 : yypt+1]
-//line parser/parser.y:1307
+//line parser/parser.y:1309
 		{
 			yyVAL.edgeHalf = &ast.StmtEdgeHalf{
 				Kind: yyDollar[1].str,
@@ -2243,7 +2245,7 @@ yydefault:
 		}
 	case 108:
 		yyDollar = yyS[yypt-6 : yypt+1]
-//line parser/parser.y:1319
+//line parser/parser.y:1321
 		{
 			yyVAL.edgeHalf = &ast.StmtEdgeHalf{
 				Kind:     yyDollar[1].str,
@@ -2254,49 +2256,49 @@ yydefault:
 		}
 	case 109:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line parser/parser.y:1330
+//line parser/parser.y:1332
 		{
 			posLast(yylex, yyDollar)                   // our pos
 			yyVAL.typ = types.NewType(yyDollar[1].str) // "bool"
 		}
 	case 110:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line parser/parser.y:1335
+//line parser/parser.y:1337
 		{
 			posLast(yylex, yyDollar)                   // our pos
 			yyVAL.typ = types.NewType(yyDollar[1].str) // "str"
 		}
 	case 111:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line parser/parser.y:1340
+//line parser/parser.y:1342
 		{
 			posLast(yylex, yyDollar)                   // our pos
 			yyVAL.typ = types.NewType(yyDollar[1].str) // "int"
 		}
 	case 112:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line parser/parser.y:1345
+//line parser/parser.y:1347
 		{
 			posLast(yylex, yyDollar)                   // our pos
 			yyVAL.typ = types.NewType(yyDollar[1].str) // "float"
 		}
 	case 113:
 		yyDollar = yyS[yypt-3 : yypt+1]
-//line parser/parser.y:1351
+//line parser/parser.y:1353
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.typ = types.NewType("[]" + yyDollar[3].typ.String())
 		}
 	case 114:
 		yyDollar = yyS[yypt-6 : yypt+1]
-//line parser/parser.y:1357
+//line parser/parser.y:1359
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.typ = types.NewType(fmt.Sprintf("map{%s: %s}", yyDollar[3].typ.String(), yyDollar[5].typ.String()))
 		}
 	case 115:
 		yyDollar = yyS[yypt-4 : yypt+1]
-//line parser/parser.y:1363
+//line parser/parser.y:1365
 		{
 			posLast(yylex, yyDollar) // our pos
 
@@ -2319,7 +2321,7 @@ yydefault:
 		}
 	case 116:
 		yyDollar = yyS[yypt-5 : yypt+1]
-//line parser/parser.y:1386
+//line parser/parser.y:1388
 		{
 			posLast(yylex, yyDollar) // our pos
 
@@ -2358,35 +2360,35 @@ yydefault:
 		}
 	case 117:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line parser/parser.y:1423
+//line parser/parser.y:1425
 		{
 			posLast(yylex, yyDollar)                   // our pos
 			yyVAL.typ = types.NewType(yyDollar[1].str) // "variant"
 		}
 	case 118:
 		yyDollar = yyS[yypt-0 : yypt+1]
-//line parser/parser.y:1430
+//line parser/parser.y:1432
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.args = []*interfaces.Arg{}
 		}
 	case 119:
 		yyDollar = yyS[yypt-3 : yypt+1]
-//line parser/parser.y:1435
+//line parser/parser.y:1437
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.args = append(yyDollar[1].args, yyDollar[3].arg)
 		}
 	case 120:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line parser/parser.y:1440
+//line parser/parser.y:1442
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.args = append([]*interfaces.Arg{}, yyDollar[1].arg)
 		}
 	case 121:
 		yyDollar = yyS[yypt-2 : yypt+1]
-//line parser/parser.y:1447
+//line parser/parser.y:1449
 		{
 			posLast(yylex, yyDollar)     // our pos
 			yyVAL.arg = &interfaces.Arg{ // reuse the Arg struct
@@ -2396,21 +2398,21 @@ yydefault:
 		}
 	case 122:
 		yyDollar = yyS[yypt-0 : yypt+1]
-//line parser/parser.y:1457
+//line parser/parser.y:1459
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.args = []*interfaces.Arg{}
 		}
 	case 123:
 		yyDollar = yyS[yypt-3 : yypt+1]
-//line parser/parser.y:1462
+//line parser/parser.y:1464
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.args = append(yyDollar[1].args, yyDollar[3].arg)
 		}
 	case 124:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line parser/parser.y:1467
+//line parser/parser.y:1469
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.args = append([]*interfaces.Arg{}, yyDollar[1].arg)
@@ -2418,7 +2420,7 @@ yydefault:
 		}
 	case 125:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line parser/parser.y:1476
+//line parser/parser.y:1478
 		{
 			yyVAL.arg = &interfaces.Arg{
 				Type: yyDollar[1].typ,
@@ -2426,7 +2428,7 @@ yydefault:
 		}
 	case 126:
 		yyDollar = yyS[yypt-2 : yypt+1]
-//line parser/parser.y:1484
+//line parser/parser.y:1486
 		{
 			yyVAL.arg = &interfaces.Arg{
 				Name: yyDollar[1].str,
@@ -2435,77 +2437,77 @@ yydefault:
 		}
 	case 127:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line parser/parser.y:1493
+//line parser/parser.y:1495
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.str = yyDollar[1].str
 		}
 	case 128:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line parser/parser.y:1499
+//line parser/parser.y:1501
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.str = yyDollar[1].str
 		}
 	case 129:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line parser/parser.y:1505
+//line parser/parser.y:1507
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.str = yyDollar[1].str
 		}
 	case 130:
 		yyDollar = yyS[yypt-2 : yypt+1]
-//line parser/parser.y:1513
+//line parser/parser.y:1515
 		{
 			posLast(yylex, yyDollar)    // our pos
 			yyVAL.str = yyDollar[2].str // don't include the leading $
 		}
 	case 131:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line parser/parser.y:1521
+//line parser/parser.y:1523
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.str = yyDollar[1].str
 		}
 	case 132:
 		yyDollar = yyS[yypt-3 : yypt+1]
-//line parser/parser.y:1527
+//line parser/parser.y:1529
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.str = yyDollar[1].str + yyDollar[2].str + yyDollar[3].str
 		}
 	case 133:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line parser/parser.y:1534
+//line parser/parser.y:1536
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.str = yyDollar[1].str
 		}
 	case 134:
 		yyDollar = yyS[yypt-3 : yypt+1]
-//line parser/parser.y:1539
+//line parser/parser.y:1541
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.str = yyDollar[1].str + interfaces.ModuleSep + yyDollar[3].str
 		}
 	case 135:
 		yyDollar = yyS[yypt-2 : yypt+1]
-//line parser/parser.y:1548
+//line parser/parser.y:1550
 		{
 			posLast(yylex, yyDollar)    // our pos
 			yyVAL.str = yyDollar[2].str // don't include the leading $
 		}
 	case 136:
 		yyDollar = yyS[yypt-1 : yypt+1]
-//line parser/parser.y:1555
+//line parser/parser.y:1557
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.str = yyDollar[1].str
 		}
 	case 137:
 		yyDollar = yyS[yypt-3 : yypt+1]
-//line parser/parser.y:1560
+//line parser/parser.y:1562
 		{
 			posLast(yylex, yyDollar) // our pos
 			yyVAL.str = yyDollar[1].str + yyDollar[2].str + yyDollar[3].str
