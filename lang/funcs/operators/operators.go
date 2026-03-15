@@ -650,6 +650,7 @@ func LookupOperator(operator string, size int) (*types.Type, error) {
 // XXX: Can we wrap SimpleFunc instead of having the boilerplate here ourselves?
 type OperatorFunc struct {
 	*docsUtil.Metadata
+	interfaces.Textarea
 
 	Type *types.Type // Kind == Function, including operator arg
 
@@ -842,7 +843,8 @@ func (obj *OperatorFunc) Init(init *interfaces.Init) error {
 // function.
 func (obj *OperatorFunc) Copy() interfaces.Func {
 	return &OperatorFunc{
-		Type: obj.Type, // don't copy because we use this after unification
+		Textarea: obj.Textarea,
+		Type:     obj.Type, // don't copy because we use this after unification
 
 		init: obj.init, // likely gets overwritten anyways
 	}
