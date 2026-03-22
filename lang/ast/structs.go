@@ -11023,7 +11023,7 @@ func (obj *ExprCall) Infer() (*types.Type, []*interfaces.UnificationInvariant, e
 			// return them directly.
 			typ, invars, err := inferableFn.FuncInfer(partialType, partialValues)
 			if err != nil {
-				return nil, nil, errwrap.Wrapf(err, "func `%s` infer error", exprFunc.Title)
+				return nil, nil, interfaces.HighlightHelper(obj, obj.data.Logf, errwrap.Wrapf(err, "func `%s` infer error", exprFunc.Title))
 			}
 			invariants = append(invariants, invars...)
 			if typ == nil { // should get a sig, not a nil!
