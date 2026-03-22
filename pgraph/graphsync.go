@@ -166,8 +166,8 @@ func (obj *Graph) GraphSync(newGraph *Graph, vertexCmpFn func(Vertex, Vertex) (b
 				edge = e // overwrite edge
 			}
 
-			oldGraph.Adjacency()[vertex1][vertex2] = edge // store it (AddEdge)
-			edgeKeep = append(edgeKeep, edge)             // mark as saved
+			oldGraph.AddEdge(vertex1, vertex2, edge) // store it
+			edgeKeep = append(edgeKeep, edge)        // mark as saved
 		}
 	}
 

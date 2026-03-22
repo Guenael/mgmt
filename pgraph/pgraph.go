@@ -58,8 +58,9 @@ func (obj *ErrNotAcyclic) Error() string {
 type Graph struct {
 	Name string
 
-	adjacency map[Vertex]map[Vertex]Edge // Vertex -> Vertex (edge)
-	kv        map[string]interface{}     // some values associated with the graph
+	adjacency  map[Vertex]map[Vertex]Edge // Vertex -> Vertex (edge): forward
+	reverseAdj map[Vertex]map[Vertex]Edge // Vertex -> Vertex (edge): reverse
+	kv         map[string]interface{}     // some values associated with the graph
 }
 
 // Vertex is the primary vertex struct in this library. It can be anything that
@@ -82,6 +83,9 @@ func (g *Graph) Init() error {
 
 	if g.adjacency == nil {
 		g.adjacency = make(map[Vertex]map[Vertex]Edge)
+	}
+	if g.reverseAdj == nil {
+		g.reverseAdj = make(map[Vertex]map[Vertex]Edge)
 	}
 	//g.kv = make(map[string]interface{}) // not required
 	return nil
@@ -121,14 +125,21 @@ func (g *Graph) Copy() *Graph {
 		return g
 	}
 	newGraph := &Graph{
-		Name:      g.Name,
-		adjacency: make(map[Vertex]map[Vertex]Edge, len(g.adjacency)),
-		kv:        g.kv,
+		Name:       g.Name,
+		adjacency:  make(map[Vertex]map[Vertex]Edge, len(g.adjacency)),
+		reverseAdj: make(map[Vertex]map[Vertex]Edge, len(g.reverseAdj)),
+		kv:         g.kv,
 	}
 	for v1, m := range g.adjacency {
-		newGraph.adjacency[v1] = make(map[Vertex]Edge)
+		newGraph.adjacency[v1] = make(map[Vertex]Edge, len(m))
 		for v2, e := range m {
 			newGraph.adjacency[v1][v2] = e // copy
+		}
+	}
+	for v1, m := range g.reverseAdj {
+		newGraph.reverseAdj[v1] = make(map[Vertex]Edge, len(m))
+		for v2, e := range m {
+			newGraph.reverseAdj[v1][v2] = e // copy
 		}
 	}
 	return newGraph
@@ -145,9 +156,10 @@ func (g *Graph) CopyWithFn(vertexCpFn func(Vertex) (Vertex, error)) (*Graph, err
 		return nil, fmt.Errorf("graph has %d vertices, but vertexCpFn is nil", l)
 	}
 	newGraph := &Graph{
-		Name:      g.Name,
-		adjacency: make(map[Vertex]map[Vertex]Edge, len(g.adjacency)),
-		kv:        g.kv,
+		Name:       g.Name,
+		adjacency:  make(map[Vertex]map[Vertex]Edge, len(g.adjacency)),
+		reverseAdj: make(map[Vertex]map[Vertex]Edge, len(g.reverseAdj)),
+		kv:         g.kv,
 	}
 	vm := make(map[Vertex]Vertex) // copy mapping from old ptr to new ptr...
 	for v1, m := range g.adjacency {
@@ -159,6 +171,7 @@ func (g *Graph) CopyWithFn(vertexCpFn func(Vertex) (Vertex, error)) (*Graph, err
 		}
 		vm[v1] = v // mapping
 		newGraph.adjacency[v] = make(map[Vertex]Edge)
+		newGraph.reverseAdj[v] = make(map[Vertex]Edge) // init reverse
 		for v2, e := range m {
 			vx, exists := vm[v2] // copied equivalent of v2
 			if !exists {
@@ -173,7 +186,8 @@ func (g *Graph) CopyWithFn(vertexCpFn func(Vertex) (Vertex, error)) (*Graph, err
 			//	return nil, err
 			//}
 			//newGraph.adjacency[v][vx] = edge
-			newGraph.adjacency[v][vx] = e // store the edge
+			newGraph.adjacency[v][vx] = e  // store the edge
+			newGraph.reverseAdj[vx][v] = e // store reverse
 		}
 	}
 	return newGraph, nil
@@ -214,12 +228,18 @@ func (g *Graph) AddVertex(xv ...Vertex) {
 	if g.adjacency == nil { // initialize on first use
 		g.adjacency = make(map[Vertex]map[Vertex]Edge)
 	}
+	if g.reverseAdj == nil { // initialize on first use
+		g.reverseAdj = make(map[Vertex]map[Vertex]Edge)
+	}
 	for _, v := range xv {
 		if v == nil {
 			panic("nil vertex")
 		}
 		if _, exists := g.adjacency[v]; !exists {
 			g.adjacency[v] = make(map[Vertex]Edge)
+		}
+		if _, exists := g.reverseAdj[v]; !exists {
+			g.reverseAdj[v] = make(map[Vertex]Edge)
 		}
 	}
 }
@@ -232,10 +252,16 @@ func (g *Graph) DeleteVertex(xv ...Vertex) {
 		if v == nil {
 			panic("nil vertex")
 		}
+		// Clean up reverse entries for outgoing edges (v -> k)
+		for k := range g.adjacency[v] {
+			delete(g.reverseAdj[k], v)
+		}
 		delete(g.adjacency, v)
-		for k := range g.adjacency {
+		// Clean up forward entries for incoming edges (k -> v)
+		for k := range g.reverseAdj[v] {
 			delete(g.adjacency[k], v)
 		}
+		delete(g.reverseAdj, v)
 		return
 	}
 
@@ -253,6 +279,14 @@ func (g *Graph) AddEdge(v1, v2 Vertex, e Edge) {
 	// NOTE: VertexMerge() depends on overwriting it at the moment...
 	// NOTE: Interpret() depends on overwriting it at the moment...
 	g.adjacency[v1][v2] = e
+	g.reverseAdj[v2][v1] = e
+}
+
+// DeleteEdgeBetween deletes the edge from v1 to v2 if it exists. It does not
+// remove any vertices.
+func (g *Graph) DeleteEdgeBetween(v1, v2 Vertex) {
+	delete(g.adjacency[v1], v2)
+	delete(g.reverseAdj[v2], v1)
 }
 
 // DeleteEdge uses variadic input to delete all the listed edges from the graph.
@@ -266,6 +300,7 @@ func (g *Graph) DeleteEdge(xe ...Edge) {
 			for _, e := range xe {
 				if e == edge {
 					delete(g.adjacency[v1], v2)
+					delete(g.reverseAdj[v2], v1)
 				}
 			}
 		}
@@ -441,10 +476,8 @@ func (g *Graph) Logf(logf func(format string, v ...interface{})) {
 // vertex v (??? -> v). OKTimestamp should probably use this.
 func (g *Graph) IncomingGraphVertices(v Vertex) []Vertex {
 	var s []Vertex
-	for k := range g.adjacency { // reverse paths
-		if _, exists := g.adjacency[k][v]; exists {
-			s = append(s, k)
-		}
+	for k := range g.reverseAdj[v] {
+		s = append(s, k)
 	}
 	return s
 }
@@ -472,12 +505,8 @@ func (g *Graph) GraphVertices(v Vertex) []Vertex {
 // Eg: (??? -> v).
 func (g *Graph) IncomingGraphEdges(v Vertex) []Edge {
 	var edges []Edge
-	for v1 := range g.adjacency { // reverse paths
-		for v2, e := range g.adjacency[v1] {
-			if v2 == v {
-				edges = append(edges, e)
-			}
-		}
+	for _, e := range g.reverseAdj[v] {
+		edges = append(edges, e)
 	}
 	return edges
 }
@@ -603,13 +632,7 @@ func (g *Graph) InDegree() map[Vertex]int {
 		return result
 	}
 	for k := range g.adjacency {
-		result[k] = 0 // initialize
-	}
-
-	for k := range g.adjacency {
-		for z := range g.adjacency[k] {
-			result[z]++
-		}
+		result[k] = len(g.reverseAdj[k])
 	}
 	return result
 }
