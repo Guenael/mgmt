@@ -184,4 +184,5 @@ download-all-auth:
 # clean removes all generated resource files and downloaded schemas.
 clean:
 	rm -f $(ROOT_DIR)/engine/resources/aws/aws_*_gen.go
+	rm -f $(ROOT_DIR)/engine/resources/aws_*_gen.go
 	rm -f $(SCHEMAS_DIR)/*.json
