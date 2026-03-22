@@ -101,7 +101,15 @@ type Engine struct {
 	World    engine.World
 
 	Debug bool
-	Logf  func(format string, v ...interface{})
+
+	// DebugCycles enables per-edge cycle detection in AddEdge. This is
+	// expensive for large graphs because it copies the graph and runs a
+	// topological sort for every edge added. The post-commit topological
+	// sort at the start of the process loop catches cycles regardless, so
+	// this is only needed to identify which specific edge caused a cycle.
+	DebugCycles bool
+
+	Logf func(format string, v ...interface{})
 
 	// graph is the internal graph. It is only changed during interrupt.
 	graph *pgraph.Graph
@@ -791,7 +799,7 @@ func (obj *Engine) AddEdge(f1, f2 interfaces.Func, fe *interfaces.FuncEdge) erro
 		obj.Logf("Engine:AddEdge %p %s: %p %s -> %p %s", fe, fe, f1, f1, f2, f2)
 	}
 
-	if obj.Debug { // not needed unless we have buggy graph building code
+	if obj.DebugCycles { // not needed unless we have buggy graph building code
 		// safety check to avoid cycles
 		g := obj.graph.Copy()
 		//g.AddVertex(f1)
@@ -829,7 +837,7 @@ func (obj *Engine) AddEdge(f1, f2 interfaces.Func, fe *interfaces.FuncEdge) erro
 
 	// This shouldn't error, since the test graph didn't find a cycle. But
 	// we don't really need to do it, since the interrupt will run it too.
-	if obj.Debug { // not needed unless we have buggy graph building code
+	if obj.DebugCycles { // not needed unless we have buggy graph building code
 		if _, err := obj.graph.TopologicalSort(); err != nil {
 			// programming error
 			panic(err) // not a dag
