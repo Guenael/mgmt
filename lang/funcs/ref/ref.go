@@ -49,10 +49,10 @@ type Count struct {
 	vertices map[interfaces.Func]int64
 
 	// edges is a reference count of the number of edges used.
-	edges map[*CountEdge]int64 // TODO: hash *CountEdge as a key instead
+	edges map[CountEdge]int64
 }
 
-// CountEdge is a virtual "hash" entry for the Count edges map key.
+// CountEdge is a hashable key for edge lookups in the reference count map.
 type CountEdge struct {
 	f1  interfaces.Func
 	f2  interfaces.Func
@@ -68,7 +68,7 @@ func (obj *Count) String() string {
 	}
 	s += fmt.Sprintf("edges (%d):\n", len(obj.edges))
 	for edge, count := range obj.edges {
-		s += fmt.Sprintf("\tedge (%d): %p %s -> %p %s # %s\n", count, edge.f1, edge.f1, edge.f2, edge.f2, edge.arg)
+		s += fmt.Sprintf("\tedge (%d): %p %s -> %p %s # %s\n", count, edge.f1, edge.f1, edge.f2, edge.f2, edge.arg) // edge is a value type
 	}
 	return s
 }
@@ -77,7 +77,7 @@ func (obj *Count) String() string {
 func (obj *Count) Init() *Count {
 	obj.mutex = &sync.Mutex{}
 	obj.vertices = make(map[interfaces.Func]int64)
-	obj.edges = make(map[*CountEdge]int64)
+	obj.edges = make(map[CountEdge]int64)
 	return obj // return self so it can be called in a chain
 }
 
@@ -121,9 +121,9 @@ func (obj *Count) VertexDec(f interfaces.Func) bool {
 // boolean values for these calls. (This function makes two calls to VertexInc.)
 func (obj *Count) EdgeInc(f1, f2 interfaces.Func, fe *interfaces.FuncEdge) (bool, bool) {
 	for _, arg := range fe.Args { // ref count each arg
-		r := obj.makeEdge(f1, f2, arg)
-		count := obj.edges[r]
-		obj.edges[r] = count + 1
+		key := CountEdge{f1: f1, f2: f2, arg: arg}
+		count := obj.edges[key]
+		obj.edges[key] = count + 1
 		if count == -1 { // unlikely, but catch any bugs
 			panic("negative reference count")
 		}
@@ -138,9 +138,9 @@ func (obj *Count) EdgeInc(f1, f2 interfaces.Func, fe *interfaces.FuncEdge) (bool
 // boolean values for these calls. (This function makes two calls to VertexDec.)
 func (obj *Count) EdgeDec(f1, f2 interfaces.Func, fe *interfaces.FuncEdge) (bool, bool) {
 	for _, arg := range fe.Args { // ref count each arg
-		r := obj.makeEdge(f1, f2, arg)
-		count := obj.edges[r]
-		obj.edges[r] = count - 1
+		key := CountEdge{f1: f1, f2: f2, arg: arg}
+		count := obj.edges[key]
+		obj.edges[key] = count - 1
 		if count == 0 {
 			panic("negative reference count")
 		}
@@ -160,22 +160,12 @@ func (obj *Count) FreeVertex(f interfaces.Func) error {
 
 // FreeEdge removes exactly one entry from the Edges list or it errors.
 func (obj *Count) FreeEdge(f1, f2 interfaces.Func, arg string) error {
-	found := []*CountEdge{}
-	for k, count := range obj.edges {
-		//if k == nil { // programming error
-		//	continue
-		//}
-		if k.f1 == f1 && k.f2 == f2 && k.arg == arg && count == 0 {
-			found = append(found, k)
-		}
-	}
-	if len(found) > 1 {
-		return fmt.Errorf("inconsistent ref count for edge")
-	}
-	if len(found) == 0 {
+	key := CountEdge{f1: f1, f2: f2, arg: arg}
+	count, exists := obj.edges[key]
+	if !exists || count != 0 {
 		return fmt.Errorf("no edge of count zero found")
 	}
-	delete(obj.edges, found[0]) // delete from map
+	delete(obj.edges, key)
 	return nil
 }
 
@@ -186,17 +176,17 @@ func (obj *Count) GC(graphAPI interfaces.GraphAPI) error {
 	//fmt.Printf("start refs\n%s", obj.String())
 	//defer func() { fmt.Printf("end refs\n%s", obj.String()) }()
 	free := make(map[interfaces.Func]map[interfaces.Func][]string) // f1 -> f2
-	for x, count := range obj.edges {
+	for key, count := range obj.edges {
 		if count != 0 { // we only care about freed things
 			continue
 		}
-		if _, exists := free[x.f1]; !exists {
-			free[x.f1] = make(map[interfaces.Func][]string)
+		if _, exists := free[key.f1]; !exists {
+			free[key.f1] = make(map[interfaces.Func][]string)
 		}
-		if _, exists := free[x.f1][x.f2]; !exists {
-			free[x.f1][x.f2] = []string{}
+		if _, exists := free[key.f1][key.f2]; !exists {
+			free[key.f1][key.f2] = []string{}
 		}
-		free[x.f1][x.f2] = append(free[x.f1][x.f2], x.arg) // exists as refcount zero
+		free[key.f1][key.f2] = append(free[key.f1][key.f2], key.arg) // exists as refcount zero
 	}
 
 	// These edges have a refcount of zero.
@@ -252,8 +242,8 @@ func (obj *Count) GC(graphAPI interfaces.GraphAPI) error {
 		}
 
 		// safety check, vertex is still in use by an edge
-		for x := range obj.edges {
-			if x.f1 == vertex || x.f2 == vertex {
+		for key := range obj.edges {
+			if key.f1 == vertex || key.f2 == vertex {
 				// programming error
 				return fmt.Errorf("vertex unexpectedly still in use: %p %s", vertex, vertex)
 			}
@@ -275,20 +265,3 @@ func (obj *Count) GC(graphAPI interfaces.GraphAPI) error {
 	return nil
 }
 
-// makeEdge looks up an edge with the "hash" input we are seeking. If it doesn't
-// find a match, it returns a new one with those fields.
-func (obj *Count) makeEdge(f1, f2 interfaces.Func, arg string) *CountEdge {
-	for k := range obj.edges {
-		//if k == nil { // programming error
-		//	continue
-		//}
-		if k.f1 == f1 && k.f2 == f2 && k.arg == arg {
-			return k
-		}
-	}
-	return &CountEdge{ // not found, so make a new one!
-		f1:  f1,
-		f2:  f2,
-		arg: arg,
-	}
-}
