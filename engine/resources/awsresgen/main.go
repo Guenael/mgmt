@@ -95,17 +95,30 @@ func main() {
 		serviceSchemas[service] = append(serviceSchemas[service], f)
 	}
 
-	// Generate one file per service.
+	// Generate one file per service, skipping if the output is already
+	// up-to-date (newer than all input schemas and the template).
+	generated := 0
+	skipped := 0
 	for service, files := range serviceSchemas {
 		outputFile := filepath.Join(*outputDir, fmt.Sprintf("aws_%s_gen.go", service))
-		log.Printf("Generating %s from %d schema(s)...", outputFile, len(files))
 
+		if isUpToDate(outputFile, files, *templates) {
+			skipped++
+			continue
+		}
+
+		log.Printf("Generating %s from %d schema(s)...", outputFile, len(files))
 		if err := generateServiceFile(files, outputFile, *templates); err != nil {
 			log.Fatalf("error generating %s: %v", outputFile, err)
 		}
+		generated++
 	}
 
-	log.Printf("Done. Generated %d service file(s) from %d schema(s).", len(serviceSchemas), len(filtered))
+	if generated == 0 && skipped > 0 {
+		log.Printf("All %d service file(s) are up-to-date.", skipped)
+	} else {
+		log.Printf("Generated %d service file(s), %d up-to-date.", generated, skipped)
+	}
 }
 
 // serviceFromFilename extracts the service name from a schema filename.
@@ -147,6 +160,36 @@ func loadWhitelist(path string) (map[string]bool, error) {
 	}
 
 	return result, nil
+}
+
+// isUpToDate returns true if outputFile exists and is newer than all input
+// schema files and the template file.
+func isUpToDate(outputFile string, schemaFiles []string, templateFile string) bool {
+	outInfo, err := os.Stat(outputFile)
+	if err != nil {
+		return false // output doesn't exist
+	}
+	outTime := outInfo.ModTime()
+
+	for _, f := range schemaFiles {
+		info, err := os.Stat(f)
+		if err != nil {
+			return false
+		}
+		if info.ModTime().After(outTime) {
+			return false // schema is newer
+		}
+	}
+
+	tplInfo, err := os.Stat(templateFile)
+	if err != nil {
+		return false
+	}
+	if tplInfo.ModTime().After(outTime) {
+		return false // template is newer
+	}
+
+	return true
 }
 
 // typeNameOnly is a minimal struct for peeking at a schema's typeName without
