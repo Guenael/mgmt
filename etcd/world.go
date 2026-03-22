@@ -69,6 +69,7 @@ type World struct {
 	StandaloneFs   engine.Fs // store an fs here for local usage
 	GetURI         func() string
 
+	ctx          context.Context
 	init         *engine.WorldInit
 	client       interfaces.Client
 	simpleDeploy *deployer.SimpleDeploy
@@ -78,6 +79,7 @@ type World struct {
 
 // Connect runs first.
 func (obj *World) Connect(ctx context.Context, init *engine.WorldInit) error {
+	obj.ctx = ctx
 	obj.init = init
 
 	obj.client = obj.Client // legacy default
@@ -303,6 +305,8 @@ func (obj *World) Fs(uri string) (engine.Fs, error) {
 		Client:     obj.client, // TODO: do we need to add a namespace?
 		Metadata:   u.Path,
 		DataPrefix: obj.StoragePrefix,
+
+		Ctx: obj.ctx,
 
 		Debug: obj.init.Debug,
 		Logf: func(format string, v ...interface{}) {
