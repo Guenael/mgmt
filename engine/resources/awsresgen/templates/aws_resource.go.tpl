@@ -31,7 +31,7 @@
 
 //go:build !noaws
 
-package resources
+package aws
 
 import (
 	"context"
@@ -41,7 +41,6 @@ import (
 	"strings"
 
 	"github.com/purpleidea/mgmt/engine"
-	"github.com/purpleidea/mgmt/engine/resources/aws"
 	"github.com/purpleidea/mgmt/engine/traits"
 	"github.com/purpleidea/mgmt/util/errwrap"
 )
@@ -51,7 +50,6 @@ var _ = context.Background
 var _ = json.Marshal
 var _ = os.Getenv
 var _ = strings.Join
-var _ = aws.NewClient
 var _ = errwrap.Wrapf
 {{range .Resources}}
 func init() {
@@ -91,7 +89,7 @@ type {{.GoStructName}} struct {
 	{{.GoName}} {{.GoType}} `lang:"{{.LangTag}}" yaml:"{{.LangTag}}" json:"{{.JSONTag}}"`
 {{end}}
 	// client is the Cloud Control API client.
-	client *aws.Client
+	client *Client
 }
 
 // Default returns some sensible defaults for this resource.
@@ -137,7 +135,7 @@ func (obj *{{.GoStructName}}) Init(init *engine.Init) error {
 		region = os.Getenv("AWS_DEFAULT_REGION")
 	}
 
-	client, err := aws.NewClient(context.TODO(), region)
+	client, err := NewClient(context.TODO(), region)
 	if err != nil {
 		return errwrap.Wrapf(err, "error creating AWS client")
 	}
@@ -213,7 +211,7 @@ func (obj *{{.GoStructName}}) CheckApply(ctx context.Context, apply bool) (bool,
 	obj.populateReadOnly(current)
 
 	// Compare current with desired.
-	patch := aws.ComputePatch(current, desired, obj.readOnlyFields())
+	patch := ComputePatch(current, desired, obj.readOnlyFields())
 	if len(patch) == 0 {
 		return true, nil // converged
 	}

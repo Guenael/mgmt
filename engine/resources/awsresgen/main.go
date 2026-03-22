@@ -32,21 +32,31 @@
 package main
 
 import (
+	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
 	"strings"
 )
 
 var (
-	schemasDir = flag.String("schemas", "engine/resources/awsresgen/schemas", "path to CFN schema directory")
-	outputDir  = flag.String("output", "engine/resources", "output directory for generated files")
-	templates  = flag.String("templates", "engine/resources/awsresgen/templates/aws_resource.go.tpl", "path to the Go template")
+	schemasDir    = flag.String("schemas", "engine/resources/awsresgen/schemas", "path to CFN schema directory")
+	outputDir     = flag.String("output", "engine/resources/aws", "output directory for generated files")
+	templates     = flag.String("templates", "engine/resources/awsresgen/templates/aws_resource.go.tpl", "path to the Go template")
+	resourcesFile = flag.String("resources", "", "path to resources.txt whitelist (if empty, process all schemas)")
 )
 
 func main() {
 	flag.Parse()
+
+	// Load the whitelist if provided.
+	whitelist, err := loadWhitelist(*resourcesFile)
+	if err != nil {
+		log.Fatalf("error loading resources file: %v", err)
+	}
 
 	// Find all JSON schema files.
 	schemaFiles, err := filepath.Glob(filepath.Join(*schemasDir, "*.json"))
@@ -58,9 +68,29 @@ func main() {
 		log.Fatalf("no schema files found in %s", *schemasDir)
 	}
 
-	// Group schemas by service.
-	serviceSchemas := map[string][]string{} // service -> list of schema file paths
+	// Filter schemas against the whitelist by peeking at each file's
+	// typeName field. This avoids loading full schemas into memory for
+	// types we don't need.
+	filtered := []string{}
 	for _, f := range schemaFiles {
+		typeName, err := peekTypeName(f)
+		if err != nil {
+			log.Printf("warning: skipping %s: %v", f, err)
+			continue
+		}
+		if whitelist != nil && !whitelist[typeName] {
+			continue
+		}
+		filtered = append(filtered, f)
+	}
+
+	if len(filtered) == 0 {
+		log.Fatalf("no schemas matched the whitelist in %s", *resourcesFile)
+	}
+
+	// Group schemas by service.
+	serviceSchemas := map[string][]string{}
+	for _, f := range filtered {
 		service := serviceFromFilename(filepath.Base(f))
 		serviceSchemas[service] = append(serviceSchemas[service], f)
 	}
@@ -75,7 +105,7 @@ func main() {
 		}
 	}
 
-	log.Printf("Done. Generated %d service file(s).", len(serviceSchemas))
+	log.Printf("Done. Generated %d service file(s) from %d schema(s).", len(serviceSchemas), len(filtered))
 }
 
 // serviceFromFilename extracts the service name from a schema filename.
@@ -87,4 +117,60 @@ func serviceFromFilename(filename string) string {
 		return strings.ToLower(parts[1])
 	}
 	return strings.ToLower(name)
+}
+
+// loadWhitelist reads a resources.txt file and returns a set of type names.
+// Lines starting with # are comments, empty lines are ignored. Returns nil if
+// path is empty (meaning process all schemas).
+func loadWhitelist(path string) (map[string]bool, error) {
+	if path == "" {
+		return nil, nil
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("error opening %s: %w", path, err)
+	}
+	defer f.Close()
+
+	result := map[string]bool{}
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		result[line] = true
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading %s: %w", path, err)
+	}
+
+	return result, nil
+}
+
+// typeNameOnly is a minimal struct for peeking at a schema's typeName without
+// loading the full schema.
+type typeNameOnly struct {
+	TypeName string `json:"typeName"`
+}
+
+// peekTypeName reads just the typeName field from a schema file without
+// parsing the entire document.
+func peekTypeName(path string) (string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+
+	var t typeNameOnly
+	if err := json.Unmarshal(data, &t); err != nil {
+		return "", err
+	}
+
+	if t.TypeName == "" {
+		return "", fmt.Errorf("no typeName in %s", path)
+	}
+
+	return t.TypeName, nil
 }

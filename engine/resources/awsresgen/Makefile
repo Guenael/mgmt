@@ -40,10 +40,10 @@ generate: $(TEMPLATE) main.go generator.go
 		echo "No schemas found in $(SCHEMAS_DIR)/. Run 'make download' first."; \
 		exit 1; \
 	fi
-	@echo "Generating AWS resources from $$(ls $(SCHEMAS_DIR)/*.json | wc -l) schema(s)..."
 	@cd $(ROOT_DIR) && go run ./engine/resources/awsresgen/ \
 		-schemas=engine/resources/awsresgen/$(SCHEMAS_DIR) \
-		-output=engine/resources \
+		-output=engine/resources/aws \
+		-resources=engine/resources/awsresgen/$(RESOURCES_FILE) \
 		-templates=engine/resources/awsresgen/$(TEMPLATE)
 
 # --------------------------------------------------------------------------
@@ -183,5 +183,5 @@ download-all-auth:
 
 # clean removes all generated resource files and downloaded schemas.
 clean:
-	rm -f $(OUTPUT_DIR)/aws_*_gen.go
+	rm -f $(ROOT_DIR)/engine/resources/aws/aws_*_gen.go
 	rm -f $(SCHEMAS_DIR)/*.json
