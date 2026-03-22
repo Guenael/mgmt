@@ -5,7 +5,9 @@ go 1.25.7
 require (
 	github.com/alexflint/go-arg v1.5.1
 	github.com/ashcrow/osrelease v0.0.0-20180626175927-9b292693c55c
-	github.com/aws/aws-sdk-go v1.55.6
+	github.com/aws/aws-sdk-go-v2 v1.41.4
+	github.com/aws/aws-sdk-go-v2/config v1.32.12
+	github.com/aws/aws-sdk-go-v2/service/cloudcontrol v1.29.12
 	github.com/bmc-toolbox/bmclib/v2 v2.3.5-0.20260201115749-55a0937f00cf
 	github.com/bmc-toolbox/common v0.0.0-20250114061816-fab80349cae0
 	github.com/coredhcp/coredhcp v0.0.0-20250113163832-cbc175753a45
@@ -64,6 +66,18 @@ require (
 	github.com/VictorLowther/soap v0.0.0-20150314151524-8e36fca84b22 // indirect
 	github.com/alexflint/go-scalar v1.2.0 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
+	github.com/aws/aws-sdk-go-v2/credentials v1.19.12 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.20 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.20 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.20 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.6 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.7 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.20 // indirect
+	github.com/aws/aws-sdk-go-v2/service/signin v1.0.8 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.30.13 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.35.17 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.41.9 // indirect
+	github.com/aws/smithy-go v1.24.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
 	github.com/bytedance/sonic v1.13.2 // indirect
@@ -115,7 +129,6 @@ require (
 	github.com/jacobweinstock/iamt v0.0.0-20260123165119-f91c8db551e5 // indirect
 	github.com/jacobweinstock/registrar v0.4.7 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
-	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jonboulle/clockwork v0.5.0 // indirect
 	github.com/josharian/native v1.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
