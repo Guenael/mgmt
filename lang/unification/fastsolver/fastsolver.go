@@ -134,9 +134,16 @@ func (obj *FastInvariantSolver) Solve(ctx context.Context, data *unification.Dat
 		if err := unificationUtil.Unify(x.Expect, x.Actual); err != nil {
 			// Storing the Expr with this invariant is so that we
 			// can generate this more helpful error message here.
+			type isSetChecker interface {
+				IsSet() bool
+			}
 			displayer, ok := x.Node.(interfaces.TextDisplayer)
 			if !ok {
 				obj.Logf("not displayable: %v\n", x.Node)
+				return nil, errwrap.Wrapf(err, "unify error with: %s", x.Expr)
+			}
+			if checker, ok := x.Node.(isSetChecker); ok && !checker.IsSet() {
+				obj.Logf("not set: %v\n", x.Node)
 				return nil, errwrap.Wrapf(err, "unify error with: %s", x.Expr)
 			}
 			if highlight := displayer.HighlightText(); highlight != "" {
