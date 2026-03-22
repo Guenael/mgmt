@@ -1,0 +1,36 @@
+# AWS CloudFormation resource types to download and generate.
+# One type per line. Lines starting with # are comments.
+#
+# To see all available types: make list
+# To see types for a specific service: make list | grep EC2
+#
+# After editing this file, run:
+#   make download
+#   make generate
+
+# Compute
+AWS::EC2::Instance
+AWS::EC2::SecurityGroup
+AWS::EC2::Subnet
+AWS::EC2::VPC
+
+# Storage
+AWS::S3::Bucket
+
+# Database
+AWS::DynamoDB::Table
+AWS::RDS::DBInstance
+
+# Serverless
+AWS::Lambda::Function
+
+# Identity
+AWS::IAM::Role
+
+# Messaging
+AWS::SNS::Topic
+AWS::SQS::Queue
+
+# Networking
+AWS::ElasticLoadBalancingV2::LoadBalancer
+AWS::Route53::HostedZone
