@@ -410,20 +410,14 @@ Start:
 
 			// if no incoming edges, no incoming data, so this noop's
 
-			si := &types.Type{
-				// input to functions are structs
-				Kind: types.KindStruct,
-				Map:  node.Func.Info().Sig.Map,
-				Ord:  node.Func.Info().Sig.Ord,
-			}
-			st := types.NewStruct(si)
+			st := types.NewStruct(node.cachedSi)
 			// The above builds a struct with fields
 			// populated for each key (empty values)
 			// so we need to very carefully check if
 			// every field is received before we can
 			// safely send it downstream to an edge.
-			need := make(map[string]struct{}) // keys we need
-			for _, k := range node.Func.Info().Sig.Ord {
+			need := make(map[string]struct{}, len(node.cachedSi.Ord)) // keys we need
+			for _, k := range node.cachedSi.Ord {
 				need[k] = struct{}{}
 			}
 
@@ -735,6 +729,12 @@ func (obj *Engine) addVertex(f interfaces.Func) error {
 
 		//running: false,
 		//epoch: 0,
+
+		cachedSi: &types.Type{
+			Kind: types.KindStruct,
+			Map:  sig.Map,
+			Ord:  sig.Ord,
+		},
 	}
 
 	init := &interfaces.Init{
@@ -1058,6 +1058,11 @@ type state struct {
 
 	// result is the latest output from calling this function.
 	result types.Value
+
+	// cachedSi is the pre-built struct type for this function's input
+	// signature. It is populated once when the vertex is added to avoid
+	// repeated allocation in the process loop.
+	cachedSi *types.Type
 }
 
 // String implements the fmt.Stringer interface for pretty printing!
