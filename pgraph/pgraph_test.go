@@ -32,7 +32,9 @@
 package pgraph
 
 import (
+	"fmt"
 	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -1134,5 +1136,603 @@ func TestSetValue(t *testing.T) {
 		t.Errorf("key %s doesn't exist", key)
 	} else if v != value {
 		t.Errorf("expecting value of %s at %s position, got %v", value, key, v)
+	}
+}
+
+// sortedVertexNames returns sorted string names of vertices for deterministic
+// comparison.
+func sortedVertexNames(vs []Vertex) []string {
+	names := make([]string, len(vs))
+	for i, v := range vs {
+		names[i] = v.String()
+	}
+	sort.Strings(names)
+	return names
+}
+
+// sortedEdgeNames returns sorted string names of edges for deterministic
+// comparison.
+func sortedEdgeNames(es []Edge) []string {
+	names := make([]string, len(es))
+	for i, e := range es {
+		names[i] = e.String()
+	}
+	sort.Strings(names)
+	return names
+}
+
+func TestIncomingGraphVertices1(t *testing.T) {
+	g, _ := NewGraph("g")
+
+	v1 := NV("v1")
+	v2 := NV("v2")
+	v3 := NV("v3")
+	v4 := NV("v4")
+
+	e1 := NE("e1")
+	e2 := NE("e2")
+	e3 := NE("e3")
+
+	g.AddEdge(v1, v3, e1)
+	g.AddEdge(v2, v3, e2)
+	g.AddEdge(v4, v3, e3)
+
+	incoming := g.IncomingGraphVertices(v3)
+	names := sortedVertexNames(incoming)
+	expected := []string{"v1", "v2", "v4"}
+	if !reflect.DeepEqual(names, expected) {
+		t.Errorf("expected incoming vertices %v, got %v", expected, names)
+	}
+
+	// v1 has no incoming vertices
+	incoming = g.IncomingGraphVertices(v1)
+	if len(incoming) != 0 {
+		t.Errorf("expected 0 incoming vertices for v1, got %d", len(incoming))
+	}
+}
+
+func TestIncomingGraphVertices2(t *testing.T) {
+	g, _ := NewGraph("g")
+
+	v1 := NV("v1")
+	v2 := NV("v2")
+	v3 := NV("v3")
+
+	e1 := NE("e1")
+	e2 := NE("e2")
+
+	g.AddEdge(v1, v2, e1)
+	g.AddEdge(v2, v3, e2)
+
+	// chain: v1 -> v2 -> v3
+	incoming := g.IncomingGraphVertices(v2)
+	names := sortedVertexNames(incoming)
+	expected := []string{"v1"}
+	if !reflect.DeepEqual(names, expected) {
+		t.Errorf("expected incoming vertices %v, got %v", expected, names)
+	}
+
+	incoming = g.IncomingGraphVertices(v3)
+	names = sortedVertexNames(incoming)
+	expected = []string{"v2"}
+	if !reflect.DeepEqual(names, expected) {
+		t.Errorf("expected incoming vertices %v, got %v", expected, names)
+	}
+}
+
+func TestIncomingGraphVerticesIsolated(t *testing.T) {
+	g, _ := NewGraph("g")
+
+	v1 := NV("v1")
+	v2 := NV("v2")
+
+	g.AddVertex(v1)
+	g.AddVertex(v2)
+
+	incoming := g.IncomingGraphVertices(v1)
+	if len(incoming) != 0 {
+		t.Errorf("expected 0 incoming for isolated vertex, got %d", len(incoming))
+	}
+}
+
+func TestIncomingGraphEdges1(t *testing.T) {
+	g, _ := NewGraph("g")
+
+	v1 := NV("v1")
+	v2 := NV("v2")
+	v3 := NV("v3")
+	v4 := NV("v4")
+
+	e1 := NE("e1")
+	e2 := NE("e2")
+	e3 := NE("e3")
+
+	g.AddEdge(v1, v4, e1)
+	g.AddEdge(v2, v4, e2)
+	g.AddEdge(v3, v4, e3)
+
+	edges := g.IncomingGraphEdges(v4)
+	names := sortedEdgeNames(edges)
+	expected := []string{"e1", "e2", "e3"}
+	if !reflect.DeepEqual(names, expected) {
+		t.Errorf("expected incoming edges %v, got %v", expected, names)
+	}
+
+	// v1 has no incoming edges
+	edges = g.IncomingGraphEdges(v1)
+	if len(edges) != 0 {
+		t.Errorf("expected 0 incoming edges for v1, got %d", len(edges))
+	}
+}
+
+func TestIncomingGraphEdgesOverwrite(t *testing.T) {
+	g, _ := NewGraph("g")
+
+	v1 := NV("v1")
+	v2 := NV("v2")
+
+	e1 := NE("e1")
+	e2 := NE("e2")
+
+	g.AddEdge(v1, v2, e1)
+	g.AddEdge(v1, v2, e2) // overwrites e1
+
+	edges := g.IncomingGraphEdges(v2)
+	if len(edges) != 1 {
+		t.Errorf("expected 1 incoming edge after overwrite, got %d", len(edges))
+		return
+	}
+	if edges[0] != e2 {
+		t.Errorf("expected edge e2 after overwrite, got %s", edges[0])
+	}
+}
+
+func TestInDegree1(t *testing.T) {
+	g, _ := NewGraph("g")
+
+	v1 := NV("v1")
+	v2 := NV("v2")
+	v3 := NV("v3")
+	v4 := NV("v4")
+
+	e1 := NE("e1")
+	e2 := NE("e2")
+	e3 := NE("e3")
+	e4 := NE("e4")
+
+	g.AddEdge(v1, v3, e1)
+	g.AddEdge(v2, v3, e2)
+	g.AddEdge(v3, v4, e3)
+	g.AddEdge(v1, v4, e4)
+
+	degree := g.InDegree()
+	if degree[v1] != 0 {
+		t.Errorf("expected in-degree 0 for v1, got %d", degree[v1])
+	}
+	if degree[v2] != 0 {
+		t.Errorf("expected in-degree 0 for v2, got %d", degree[v2])
+	}
+	if degree[v3] != 2 {
+		t.Errorf("expected in-degree 2 for v3, got %d", degree[v3])
+	}
+	if degree[v4] != 2 {
+		t.Errorf("expected in-degree 2 for v4, got %d", degree[v4])
+	}
+}
+
+func TestInDegreeIsolated(t *testing.T) {
+	g, _ := NewGraph("g")
+
+	v1 := NV("v1")
+	g.AddVertex(v1)
+
+	degree := g.InDegree()
+	if degree[v1] != 0 {
+		t.Errorf("expected in-degree 0 for isolated vertex, got %d", degree[v1])
+	}
+}
+
+func TestDeleteVertexIncoming(t *testing.T) {
+	g, _ := NewGraph("g")
+
+	v1 := NV("v1")
+	v2 := NV("v2")
+	v3 := NV("v3")
+
+	e1 := NE("e1")
+	e2 := NE("e2")
+	e3 := NE("e3")
+
+	g.AddEdge(v1, v2, e1)
+	g.AddEdge(v2, v3, e2)
+	g.AddEdge(v1, v3, e3)
+
+	// Delete v2, which has incoming (v1->v2) and outgoing (v2->v3)
+	g.DeleteVertex(v2)
+
+	if g.NumVertices() != 2 {
+		t.Errorf("expected 2 vertices after delete, got %d", g.NumVertices())
+	}
+
+	// v3 should now only have v1 as incoming
+	incoming := g.IncomingGraphVertices(v3)
+	names := sortedVertexNames(incoming)
+	expected := []string{"v1"}
+	if !reflect.DeepEqual(names, expected) {
+		t.Errorf("expected incoming vertices %v for v3, got %v", expected, names)
+	}
+
+	// v1 should have no incoming
+	incoming = g.IncomingGraphVertices(v1)
+	if len(incoming) != 0 {
+		t.Errorf("expected 0 incoming for v1, got %d", len(incoming))
+	}
+
+	// v2 should not appear anywhere
+	incoming = g.IncomingGraphVertices(v2)
+	if len(incoming) != 0 {
+		t.Errorf("expected 0 incoming for deleted v2, got %d", len(incoming))
+	}
+}
+
+func TestDeleteVertexMultiple(t *testing.T) {
+	g, _ := NewGraph("g")
+
+	v1 := NV("v1")
+	v2 := NV("v2")
+	v3 := NV("v3")
+	v4 := NV("v4")
+
+	e1 := NE("e1")
+	e2 := NE("e2")
+	e3 := NE("e3")
+
+	g.AddEdge(v1, v3, e1)
+	g.AddEdge(v2, v3, e2)
+	g.AddEdge(v3, v4, e3)
+
+	// Delete multiple vertices at once
+	g.DeleteVertex(v1, v2)
+
+	if g.NumVertices() != 2 {
+		t.Errorf("expected 2 vertices after bulk delete, got %d", g.NumVertices())
+	}
+
+	incoming := g.IncomingGraphVertices(v3)
+	if len(incoming) != 0 {
+		t.Errorf("expected 0 incoming for v3 after deleting sources, got %d", len(incoming))
+	}
+}
+
+func TestDeleteEdgeIncoming(t *testing.T) {
+	g, _ := NewGraph("g")
+
+	v1 := NV("v1")
+	v2 := NV("v2")
+	v3 := NV("v3")
+
+	e1 := NE("e1")
+	e2 := NE("e2")
+
+	g.AddEdge(v1, v3, e1)
+	g.AddEdge(v2, v3, e2)
+
+	g.DeleteEdge(e1)
+
+	incoming := g.IncomingGraphVertices(v3)
+	names := sortedVertexNames(incoming)
+	expected := []string{"v2"}
+	if !reflect.DeepEqual(names, expected) {
+		t.Errorf("expected incoming vertices %v after edge delete, got %v", expected, names)
+	}
+
+	edges := g.IncomingGraphEdges(v3)
+	if len(edges) != 1 || edges[0] != e2 {
+		t.Errorf("expected only edge e2 remaining, got %v", sortedEdgeNames(edges))
+	}
+
+	degree := g.InDegree()
+	if degree[v3] != 1 {
+		t.Errorf("expected in-degree 1 for v3, got %d", degree[v3])
+	}
+}
+
+func TestDeleteAllEdgesIncoming(t *testing.T) {
+	g, _ := NewGraph("g")
+
+	v1 := NV("v1")
+	v2 := NV("v2")
+	v3 := NV("v3")
+
+	e1 := NE("e1")
+	e2 := NE("e2")
+
+	g.AddEdge(v1, v3, e1)
+	g.AddEdge(v2, v3, e2)
+
+	g.DeleteEdge(e1, e2)
+
+	incoming := g.IncomingGraphVertices(v3)
+	if len(incoming) != 0 {
+		t.Errorf("expected 0 incoming after all edge delete, got %d", len(incoming))
+	}
+
+	edges := g.IncomingGraphEdges(v3)
+	if len(edges) != 0 {
+		t.Errorf("expected 0 incoming edges after all delete, got %d", len(edges))
+	}
+
+	// vertices should still exist
+	if g.NumVertices() != 3 {
+		t.Errorf("expected 3 vertices after edge delete, got %d", g.NumVertices())
+	}
+}
+
+func TestCopyIncoming(t *testing.T) {
+	g, _ := NewGraph("g")
+
+	v1 := NV("v1")
+	v2 := NV("v2")
+	v3 := NV("v3")
+
+	e1 := NE("e1")
+	e2 := NE("e2")
+
+	g.AddEdge(v1, v3, e1)
+	g.AddEdge(v2, v3, e2)
+
+	cp := g.Copy()
+
+	// Copy should preserve incoming queries
+	incoming := cp.IncomingGraphVertices(v3)
+	names := sortedVertexNames(incoming)
+	expected := []string{"v1", "v2"}
+	if !reflect.DeepEqual(names, expected) {
+		t.Errorf("copy: expected incoming vertices %v, got %v", expected, names)
+	}
+
+	edges := cp.IncomingGraphEdges(v3)
+	edgeNames := sortedEdgeNames(edges)
+	expectedEdges := []string{"e1", "e2"}
+	if !reflect.DeepEqual(edgeNames, expectedEdges) {
+		t.Errorf("copy: expected incoming edges %v, got %v", expectedEdges, edgeNames)
+	}
+
+	degree := cp.InDegree()
+	if degree[v3] != 2 {
+		t.Errorf("copy: expected in-degree 2 for v3, got %d", degree[v3])
+	}
+
+	// Modifying copy should not affect original
+	cp.DeleteVertex(v1)
+	origIncoming := g.IncomingGraphVertices(v3)
+	if len(origIncoming) != 2 {
+		t.Errorf("original should still have 2 incoming for v3, got %d", len(origIncoming))
+	}
+}
+
+// NOTE: CopyWithFn has a pre-existing iteration-order issue where destination
+// vertices may not yet be in the copy mapping when edges are processed, since
+// it does vertices and edges in a single pass over the adjacency map. Testing
+// incoming queries after CopyWithFn is deferred until that is fixed.
+
+func TestGraphSyncIncoming(t *testing.T) {
+	g, _ := NewGraph("g")
+
+	v1 := NV("v1")
+	v2 := NV("v2")
+	v3 := NV("v3")
+
+	e1 := NE("e1")
+	e2 := NE("e2")
+
+	g.AddEdge(v1, v2, e1)
+	g.AddEdge(v2, v3, e2)
+
+	// New graph with different edges
+	ng, _ := NewGraph("ng")
+	v4 := NV("v4")
+	e3 := NE("e3")
+	e4 := NE("e4")
+
+	ng.AddEdge(v1, v3, e3)
+	ng.AddEdge(v4, v3, e4)
+
+	err := g.GraphSync(ng, nil, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("GraphSync failed: %v", err)
+	}
+
+	incoming := g.IncomingGraphVertices(v3)
+	names := sortedVertexNames(incoming)
+	expected := []string{"v1", "v4"}
+	if !reflect.DeepEqual(names, expected) {
+		t.Errorf("GraphSync: expected incoming vertices %v for v3, got %v", expected, names)
+	}
+
+	// v2 should be gone
+	if g.HasVertex(v2) {
+		t.Errorf("GraphSync: v2 should have been removed")
+	}
+}
+
+func TestAddEdgeOverwriteIncoming(t *testing.T) {
+	g, _ := NewGraph("g")
+
+	v1 := NV("v1")
+	v2 := NV("v2")
+
+	e1 := NE("e1")
+	e2 := NE("e2")
+
+	g.AddEdge(v1, v2, e1)
+	g.AddEdge(v1, v2, e2) // overwrite
+
+	incoming := g.IncomingGraphVertices(v2)
+	if len(incoming) != 1 {
+		t.Errorf("expected 1 incoming vertex after overwrite, got %d", len(incoming))
+	}
+
+	edges := g.IncomingGraphEdges(v2)
+	if len(edges) != 1 || edges[0] != e2 {
+		t.Errorf("expected edge e2 after overwrite, got %v", edges)
+	}
+
+	degree := g.InDegree()
+	if degree[v2] != 1 {
+		t.Errorf("expected in-degree 1 after overwrite, got %d", degree[v2])
+	}
+}
+
+func TestIncomingAfterSequentialOps(t *testing.T) {
+	g, _ := NewGraph("g")
+
+	v1 := NV("v1")
+	v2 := NV("v2")
+	v3 := NV("v3")
+	v4 := NV("v4")
+
+	e1 := NE("e1")
+	e2 := NE("e2")
+	e3 := NE("e3")
+	e4 := NE("e4")
+
+	// Build up graph
+	g.AddEdge(v1, v3, e1)
+	g.AddEdge(v2, v3, e2)
+
+	incoming := g.IncomingGraphVertices(v3)
+	if len(incoming) != 2 {
+		t.Errorf("step 1: expected 2 incoming, got %d", len(incoming))
+	}
+
+	// Add more
+	g.AddEdge(v4, v3, e3)
+
+	incoming = g.IncomingGraphVertices(v3)
+	if len(incoming) != 3 {
+		t.Errorf("step 2: expected 3 incoming, got %d", len(incoming))
+	}
+
+	// Delete one source
+	g.DeleteVertex(v2)
+
+	incoming = g.IncomingGraphVertices(v3)
+	names := sortedVertexNames(incoming)
+	expected := []string{"v1", "v4"}
+	if !reflect.DeepEqual(names, expected) {
+		t.Errorf("step 3: expected incoming %v, got %v", expected, names)
+	}
+
+	// Delete an edge
+	g.DeleteEdge(e1)
+
+	incoming = g.IncomingGraphVertices(v3)
+	names = sortedVertexNames(incoming)
+	expected = []string{"v4"}
+	if !reflect.DeepEqual(names, expected) {
+		t.Errorf("step 4: expected incoming %v, got %v", expected, names)
+	}
+
+	// Add another edge
+	g.AddEdge(v1, v3, e4)
+
+	incoming = g.IncomingGraphVertices(v3)
+	names = sortedVertexNames(incoming)
+	expected = []string{"v1", "v4"}
+	if !reflect.DeepEqual(names, expected) {
+		t.Errorf("step 5: expected incoming %v, got %v", expected, names)
+	}
+
+	// Verify in-degree matches
+	degree := g.InDegree()
+	if degree[v3] != 2 {
+		t.Errorf("step 5: expected in-degree 2, got %d", degree[v3])
+	}
+}
+
+func TestIncomingLargeGraph(t *testing.T) {
+	g, _ := NewGraph("g")
+
+	// Build a fan-in graph: many sources pointing to one sink
+	sink := NV("sink")
+	g.AddVertex(sink)
+	n := 100
+	sources := make([]Vertex, n)
+	for i := 0; i < n; i++ {
+		v := NV(fmt.Sprintf("s%03d", i))
+		e := NE(fmt.Sprintf("e%03d", i))
+		sources[i] = v
+		g.AddEdge(v, sink, e)
+	}
+
+	incoming := g.IncomingGraphVertices(sink)
+	if len(incoming) != n {
+		t.Errorf("expected %d incoming vertices, got %d", n, len(incoming))
+	}
+
+	edges := g.IncomingGraphEdges(sink)
+	if len(edges) != n {
+		t.Errorf("expected %d incoming edges, got %d", n, len(edges))
+	}
+
+	degree := g.InDegree()
+	if degree[sink] != n {
+		t.Errorf("expected in-degree %d, got %d", n, degree[sink])
+	}
+
+	// Delete half the sources
+	for i := 0; i < n/2; i++ {
+		g.DeleteVertex(sources[i])
+	}
+
+	incoming = g.IncomingGraphVertices(sink)
+	if len(incoming) != n/2 {
+		t.Errorf("expected %d incoming after deletes, got %d", n/2, len(incoming))
+	}
+}
+
+func TestTopologicalSortWithInDegree(t *testing.T) {
+	g, _ := NewGraph("g")
+
+	v1 := NV("v1")
+	v2 := NV("v2")
+	v3 := NV("v3")
+	v4 := NV("v4")
+
+	e1 := NE("e1")
+	e2 := NE("e2")
+	e3 := NE("e3")
+
+	// DAG: v1 -> v2 -> v4, v1 -> v3 -> v4
+	g.AddEdge(v1, v2, e1)
+	g.AddEdge(v1, v3, e2)
+	g.AddEdge(v2, v4, e3)
+
+	sorted, err := g.TopologicalSort()
+	if err != nil {
+		t.Fatalf("TopologicalSort failed: %v", err)
+	}
+
+	if len(sorted) != 4 {
+		t.Fatalf("expected 4 vertices in sort, got %d", len(sorted))
+	}
+
+	// Build position map
+	pos := make(map[Vertex]int)
+	for i, v := range sorted {
+		pos[v] = i
+	}
+
+	// v1 must come before v2 and v3
+	if pos[v1] >= pos[v2] {
+		t.Errorf("v1 should come before v2 in topological sort")
+	}
+	if pos[v1] >= pos[v3] {
+		t.Errorf("v1 should come before v3 in topological sort")
+	}
+	// v2 must come before v4
+	if pos[v2] >= pos[v4] {
+		t.Errorf("v2 should come before v4 in topological sort")
 	}
 }
