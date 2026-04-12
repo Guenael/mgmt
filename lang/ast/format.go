@@ -258,6 +258,15 @@ func (obj *StmtRes) Format(depth int) string {
 	}
 	s := ind + prefix + obj.Kind + " " + formatExpr(obj.Name, depth) + " {"
 	if len(obj.Contents) == 0 {
+		// Preserve multi-line empty body if the original had { and }
+		// on different lines.
+		if obj.IsSet() {
+			startRow, _ := obj.Pos()
+			endRow, _ := obj.End()
+			if endRow > startRow {
+				return s + "\n" + ind + "}"
+			}
+		}
 		return s + "}"
 	}
 	s += "\n"
@@ -897,6 +906,15 @@ func formatResWithComments(res *StmtRes, comments []*CommentData, depth int) str
 	}
 
 	if len(res.Contents) == 0 && commentIdx >= len(comments) {
+		// Preserve multi-line empty body if the original had { and }
+		// on different lines.
+		if res.IsSet() {
+			startRow, _ := res.Pos()
+			endRow, _ := res.End()
+			if endRow > startRow {
+				return s + "\n" + ind + "}"
+			}
+		}
 		return s + "}"
 	}
 	s += "\n"
