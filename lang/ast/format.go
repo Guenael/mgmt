@@ -857,11 +857,15 @@ func formatProgWithComments(prog *StmtProg, comments []*CommentData, depth int) 
 		}
 	}
 
-	// Append any trailing comments.
+	// Append any trailing comments, preserving blank lines.
 	for commentIdx < len(comments) {
 		c := comments[commentIdx]
 		if !c.Inline {
+			if prevEndLine >= 0 && c.Row-prevEndLine > 1 {
+				lines = append(lines, "")
+			}
 			lines = append(lines, ind+"#"+c.Value)
+			prevEndLine = c.Row
 		}
 		commentIdx++
 	}
@@ -944,7 +948,7 @@ func formatResWithComments(res *StmtRes, comments []*CommentData, depth int) str
 		}
 		if f, ok := c.(formattable); ok {
 			formatted := f.Format(depth + 1)
-			// Append any inline comment on the same line.
+			// Append any inline comments within this content element.
 			contentEndLine := -1
 			if pn, ok := c.(interfaces.PositionableNode); ok && pn.IsSet() {
 				contentEndLine, _ = pn.End()
@@ -952,7 +956,15 @@ func formatResWithComments(res *StmtRes, comments []*CommentData, depth int) str
 			for commentIdx < len(comments) && contentEndLine >= 0 && comments[commentIdx].Row <= contentEndLine {
 				cm := comments[commentIdx]
 				if cm.Inline {
-					formatted += " #" + cm.Value
+					// If the comment is on the content's start
+					// line and the formatted output is multi-line,
+					// append to the first line, not the last.
+					if cm.Row == contentStartLine && strings.Contains(formatted, "\n") {
+						fmtLines := strings.SplitN(formatted, "\n", 2)
+						formatted = fmtLines[0] + " #" + cm.Value + "\n" + fmtLines[1]
+					} else {
+						formatted += " #" + cm.Value
+					}
 				}
 				commentIdx++
 			}
