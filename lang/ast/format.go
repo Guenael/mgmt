@@ -97,12 +97,21 @@ func interleaveComments(formatted string, comments []*CommentData, stmtStartLine
 
 	for fmtIdx < len(fmtLines) {
 		// Emit any standalone comments on this row before the code line.
-		// Use the indentation of the next formatted line so comments
-		// inside nested blocks get the correct depth.
+		// Derive indentation from surrounding lines: use the deeper of
+		// the previous and next line's indentation, since a comment
+		// before a closing brace should match the block content depth.
 		for commentIdx < len(comments) && comments[commentIdx].Row == row && !comments[commentIdx].Inline {
-			ind := ""
+			indNext := ""
 			if fmtIdx < len(fmtLines) {
-				ind = extractIndent(fmtLines[fmtIdx])
+				indNext = extractIndent(fmtLines[fmtIdx])
+			}
+			indPrev := ""
+			if len(result) > 0 {
+				indPrev = extractIndent(result[len(result)-1])
+			}
+			ind := indNext
+			if len(indPrev) > len(indNext) {
+				ind = indPrev
 			}
 			result = append(result, ind+"#"+comments[commentIdx].Value)
 			commentIdx++
@@ -218,7 +227,21 @@ func formatCallArgs(args []interfaces.Expr) string {
 // Format returns the canonically formatted MCL source for this program.
 func (obj *StmtProg) Format(depth int) string {
 	lines := []string{}
+	// Initialize prevEndLine to the prog's start row if it's close to the
+	// first statement. This preserves blank lines at the start of block
+	// bodies and keeps interleaveComments row counting in sync. We skip
+	// this if the gap is too large (parser positioning artifact for else
+	// branches where Pos() returns the if keyword's position).
 	prevEndLine := -1
+	if obj.IsSet() && len(obj.Body) > 0 {
+		progRow, _ := obj.Pos()
+		if pn, ok := obj.Body[0].(interfaces.PositionableNode); ok && pn.IsSet() {
+			firstRow, _ := pn.Pos()
+			if firstRow-progRow <= 2 {
+				prevEndLine = progRow
+			}
+		}
+	}
 	for _, stmt := range obj.Body {
 		// Preserve a single blank line between statements when the
 		// original source had a gap of 2+ lines. Multiple blank lines
@@ -291,21 +314,15 @@ func (obj *StmtRes) Format(depth int) string {
 	}
 	s += "\n"
 	lastSection := -1
-	prevEndLine := -1
 	for _, c := range obj.Contents {
 		// Insert blank line between field/meta/edge sections.
+		// Note: within-section blank lines are only preserved by
+		// formatResWithComments which has comment data to compute
+		// accurate gaps. StmtRes.Format() can't account for
+		// side-channel comments that occupy source lines.
 		sec := resContentSection(c)
 		if sec >= 0 && lastSection >= 0 && sec != lastSection {
 			s += "\n"
-		} else if prevEndLine >= 0 {
-			// Preserve blank lines within a section when the
-			// original source had a gap of 2+ lines.
-			if pn, ok := c.(interfaces.PositionableNode); ok && pn.IsSet() {
-				row, _ := pn.Pos()
-				if row-prevEndLine > 1 {
-					s += "\n"
-				}
-			}
 		}
 		if sec >= 0 {
 			lastSection = sec
@@ -316,10 +333,6 @@ func (obj *StmtRes) Format(depth int) string {
 		}
 		if f, ok := c.(formattable); ok {
 			s += f.Format(depth+1) + "\n"
-		}
-
-		if pn, ok := c.(interfaces.PositionableNode); ok && pn.IsSet() {
-			prevEndLine, _ = pn.End()
 		}
 	}
 	s += ind + "}"
@@ -977,7 +990,15 @@ func formatResWithComments(res *StmtRes, comments []*CommentData, depth int) str
 	}
 	s += "\n"
 	lastSection := -1
+	// Initialize to the resource's start row, but only if the first
+	// content element has position data (skip for collect resources
+	// where StmtResCollect is the synthetic first element with no pos).
 	prevContentEnd := -1
+	if len(res.Contents) > 0 {
+		if pn, ok := res.Contents[0].(interfaces.PositionableNode); ok && pn.IsSet() {
+			prevContentEnd = resStartLine
+		}
+	}
 	for _, c := range res.Contents {
 		// Get the original start line of this content element.
 		contentStartLine := -1
