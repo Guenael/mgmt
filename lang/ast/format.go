@@ -262,11 +262,21 @@ func (obj *StmtRes) Format(depth int) string {
 	}
 	s += "\n"
 	lastSection := -1
+	prevEndLine := -1
 	for _, c := range obj.Contents {
 		// Insert blank line between field/meta/edge sections.
 		sec := resContentSection(c)
 		if sec >= 0 && lastSection >= 0 && sec != lastSection {
 			s += "\n"
+		} else if prevEndLine >= 0 {
+			// Preserve blank lines within a section when the
+			// original source had a gap of 2+ lines.
+			if pn, ok := c.(interfaces.PositionableNode); ok && pn.IsSet() {
+				row, _ := pn.Pos()
+				if row-prevEndLine > 1 {
+					s += "\n"
+				}
+			}
 		}
 		if sec >= 0 {
 			lastSection = sec
@@ -277,6 +287,10 @@ func (obj *StmtRes) Format(depth int) string {
 		}
 		if f, ok := c.(formattable); ok {
 			s += f.Format(depth+1) + "\n"
+		}
+
+		if pn, ok := c.(interfaces.PositionableNode); ok && pn.IsSet() {
+			prevEndLine, _ = pn.End()
 		}
 	}
 	s += ind + "}"
@@ -883,6 +897,7 @@ func formatResWithComments(res *StmtRes, comments []*CommentData, depth int) str
 	}
 	s += "\n"
 	lastSection := -1
+	prevContentEnd := -1
 	for _, c := range res.Contents {
 		// Get the original start line of this content element.
 		contentStartLine := -1
@@ -891,19 +906,33 @@ func formatResWithComments(res *StmtRes, comments []*CommentData, depth int) str
 			contentStartLine = row
 		}
 
-		// Insert blank line between field/meta/edge sections.
-		sec := resContentSection(c)
-		if sec >= 0 && lastSection >= 0 && sec != lastSection {
-			s += "\n"
-		}
-
-		// Insert comments that come before this content element.
+		// Insert comments that come before this content element,
+		// preserving blank lines between them.
+		hadBlankLine := false
 		for commentIdx < len(comments) && contentStartLine >= 0 && comments[commentIdx].Row < contentStartLine {
 			cm := comments[commentIdx]
 			if !cm.Inline {
+				if prevContentEnd >= 0 && cm.Row-prevContentEnd > 1 {
+					s += "\n"
+					hadBlankLine = true
+				}
 				s += fmtIndent(depth+1) + "#" + cm.Value + "\n"
+				prevContentEnd = cm.Row
 			}
 			commentIdx++
+		}
+
+		// Insert blank line between field/meta/edge sections, or
+		// preserve blank lines within a section when the original
+		// source had a gap of 2+ lines. Skip if the comment loop
+		// already inserted a blank line for this element.
+		sec := resContentSection(c)
+		if !hadBlankLine {
+			if sec >= 0 && lastSection >= 0 && sec != lastSection {
+				s += "\n"
+			} else if prevContentEnd >= 0 && contentStartLine >= 0 && contentStartLine-prevContentEnd > 1 {
+				s += "\n"
+			}
 		}
 
 		if sec >= 0 {
@@ -928,6 +957,7 @@ func formatResWithComments(res *StmtRes, comments []*CommentData, depth int) str
 				commentIdx++
 			}
 			s += formatted + "\n"
+			prevContentEnd = contentEndLine
 		} else {
 			// Skip past comments covered by this content element.
 			contentEndLine := -1
@@ -937,6 +967,7 @@ func formatResWithComments(res *StmtRes, comments []*CommentData, depth int) str
 			for commentIdx < len(comments) && contentEndLine >= 0 && comments[commentIdx].Row <= contentEndLine {
 				commentIdx++
 			}
+			prevContentEnd = contentEndLine
 		}
 	}
 
