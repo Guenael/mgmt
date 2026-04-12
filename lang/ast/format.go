@@ -54,6 +54,25 @@ func extractIndent(s string) string {
 	return s
 }
 
+// progActualEnd returns the true end line of a statement (typically a StmtProg)
+// by walking into its child statements. This is needed because StmtProg.End()
+// often returns an inaccurate position.
+func progActualEnd(stmt interfaces.Stmt) int {
+	endLine := -1
+	if pn, ok := stmt.(interfaces.PositionableNode); ok && pn.IsSet() {
+		endLine, _ = pn.End()
+	}
+	if prog, ok := stmt.(*StmtProg); ok {
+		for _, child := range prog.Body {
+			childEnd := stmtActualEnd(child)
+			if childEnd > endLine {
+				endLine = childEnd
+			}
+		}
+	}
+	return endLine
+}
+
 // stmtActualEnd returns the true end line of a statement by walking into child
 // expressions. This is needed because the parser's locate() sometimes only
 // covers the first line of a multi-line statement (e.g., StmtBind's position
@@ -1151,11 +1170,12 @@ func formatIfWithComments(ifStmt *StmtIf, comments []*CommentData, depth int) st
 	s := ind + "if " + formatExpr(ifStmt.Condition, depth) + " {\n"
 
 	// Split comments into then-branch and else-branch based on positions.
+	// We must walk child nodes because StmtProg.End() often returns an
+	// inaccurate position (e.g., row 1 when the body actually spans to
+	// row 3).
 	thenEnd := -1
 	if ifStmt.ThenBranch != nil {
-		if pn, ok := ifStmt.ThenBranch.(interfaces.PositionableNode); ok && pn.IsSet() {
-			thenEnd, _ = pn.End()
-		}
+		thenEnd = progActualEnd(ifStmt.ThenBranch)
 	}
 
 	var thenCmts, elseCmts []*CommentData
