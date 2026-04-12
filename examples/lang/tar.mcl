@@ -1,9 +1,9 @@
 # make a tar archive!
-file "/tmp/tar/" {
+file "/tmp/tar/" { # this is a valid comment
 	state => "exists",
 }
 
-file ["/tmp/tar/a", "/tmp/tar/bb", "/tmp/tar/cccc",] {
+file ["/tmp/tar/a", "/tmp/tar/bb", "/tmp/tar/cccc",] { # this is also a valid comment
 	state => "exists",
 	content => "some file\n",
 
