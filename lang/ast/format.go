@@ -462,9 +462,9 @@ func (obj *StmtEdgeHalf) Format(depth int) string {
 func (obj *StmtResField) Format(depth int) string {
 	ind := fmtIndent(depth)
 	if obj.Condition != nil {
-		return ind + obj.Field + " => " + formatExpr(obj.Condition, 0) + " ?: " + formatExpr(obj.Value, 0) + ","
+		return ind + obj.Field + " => " + formatExpr(obj.Condition, depth) + " ?: " + formatExpr(obj.Value, depth) + ","
 	}
-	return ind + obj.Field + " => " + formatExpr(obj.Value, 0) + ","
+	return ind + obj.Field + " => " + formatExpr(obj.Value, depth) + ","
 }
 
 // Format returns the canonically formatted MCL source for this resource edge.
@@ -525,6 +525,25 @@ func (obj *ExprFloat) Format(depth int) string {
 func (obj *ExprList) Format(depth int) string {
 	if len(obj.Elements) == 0 {
 		return "[]"
+	}
+	// Check if the original source used multi-line format.
+	multiLine := false
+	if len(obj.Elements) > 0 && obj.IsSet() {
+		listRow, _ := obj.Pos()
+		if pn, ok := obj.Elements[0].(interfaces.PositionableNode); ok && pn.IsSet() {
+			elemRow, _ := pn.Pos()
+			if elemRow > listRow {
+				multiLine = true
+			}
+		}
+	}
+	if multiLine {
+		s := "[\n"
+		for _, e := range obj.Elements {
+			s += fmtIndent(depth+1) + formatExpr(e, depth+1) + ",\n"
+		}
+		s += fmtIndent(depth) + "]"
+		return s
 	}
 	parts := []string{}
 	for _, e := range obj.Elements {
@@ -845,12 +864,24 @@ func formatResWithComments(res *StmtRes, comments []*CommentData, depth int) str
 		prefix = "collect "
 	}
 	s := ind + prefix + res.Kind + " " + formatExpr(res.Name, depth) + " {"
-	if len(res.Contents) == 0 && len(comments) == 0 {
+
+	// Append any inline comment on the resource declaration line.
+	resStartLine := -1
+	if res.IsSet() {
+		resStartLine, _ = res.Pos()
+	}
+	commentIdx := 0
+	for commentIdx < len(comments) && resStartLine >= 0 && comments[commentIdx].Row == resStartLine {
+		if comments[commentIdx].Inline {
+			s += " #" + comments[commentIdx].Value
+		}
+		commentIdx++
+	}
+
+	if len(res.Contents) == 0 && commentIdx >= len(comments) {
 		return s + "}"
 	}
 	s += "\n"
-
-	commentIdx := 0
 	lastSection := -1
 	for _, c := range res.Contents {
 		// Get the original start line of this content element.
