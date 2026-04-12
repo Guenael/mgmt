@@ -514,6 +514,48 @@ func TestFormatPanic(t *testing.T) {
 	}
 }
 
+func TestFormatBlankLines(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  string
+		expect string
+	}{
+		{
+			name:   "single blank line preserved",
+			input:  "$x = 1\n\n$y = 2",
+			expect: "$x = 1\n\n$y = 2",
+		},
+		{
+			name:   "multiple blank lines collapsed to one",
+			input:  "$x = 1\n\n\n\n$y = 2",
+			expect: "$x = 1\n\n$y = 2",
+		},
+		{
+			name:   "no blank line stays as no blank line",
+			input:  "$x = 1\n$y = 2",
+			expect: "$x = 1\n$y = 2",
+		},
+		{
+			name:   "blank line between import and resource",
+			input:  "import \"fmt\"\n\n$x = 42",
+			expect: "import \"fmt\"\n\n$x = 42",
+		},
+		{
+			name:   "blank line between resources",
+			input:  "test \"t1\" {\n\tstringptr => \"a\",\n}\n\ntest \"t2\" {\n\tstringptr => \"b\",\n}",
+			expect: "test \"t1\" {\n\tstringptr => \"a\",\n}\n\ntest \"t2\" {\n\tstringptr => \"b\",\n}",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseAndFormat(t, tt.input)
+			if got != tt.expect {
+				t.Errorf("format mismatch\ngot:    %q\nexpect: %q", got, tt.expect)
+			}
+		})
+	}
+}
+
 // TestFormatIdempotent verifies that formatting already-formatted code produces
 // identical output.
 func TestFormatIdempotent(t *testing.T) {
@@ -528,6 +570,7 @@ func TestFormatIdempotent(t *testing.T) {
 		"# a comment\n$x = 42",
 		`$x = 1 + 2 * 3`,
 		`$x = $list[0] || "default"`,
+		"$x = 1\n\n$y = 2",
 	}
 	for _, input := range inputs {
 		first := parseAndFormat(t, input)

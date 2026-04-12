@@ -121,12 +121,27 @@ func formatCallArgs(args []interfaces.Expr) string {
 // Format returns the canonically formatted MCL source for this program.
 func (obj *StmtProg) Format(depth int) string {
 	lines := []string{}
+	prevEndLine := -1
 	for _, stmt := range obj.Body {
+		// Preserve a single blank line between statements when the
+		// original source had a gap of 2+ lines. Multiple blank lines
+		// are collapsed into one.
+		if pn, ok := stmt.(interfaces.PositionableNode); ok && pn.IsSet() && prevEndLine >= 0 {
+			row, _ := pn.Pos()
+			if row-prevEndLine > 1 {
+				lines = append(lines, "")
+			}
+		}
+
 		type formattable interface {
 			Format(depth int) string
 		}
 		if f, ok := stmt.(formattable); ok {
 			lines = append(lines, f.Format(depth))
+		}
+
+		if pn, ok := stmt.(interfaces.PositionableNode); ok && pn.IsSet() {
+			prevEndLine, _ = pn.End()
 		}
 	}
 	return strings.Join(lines, "\n")
@@ -601,6 +616,7 @@ func formatProgWithComments(prog *StmtProg, comments []*CommentData, depth int) 
 	ind := fmtIndent(depth)
 	lines := []string{}
 	commentIdx := 0
+	prevEndLine := -1
 
 	for _, stmt := range prog.Body {
 		// Get the original start line of this statement.
@@ -614,9 +630,20 @@ func formatProgWithComments(prog *StmtProg, comments []*CommentData, depth int) 
 		for commentIdx < len(comments) && stmtStartLine >= 0 && comments[commentIdx].Row < stmtStartLine {
 			c := comments[commentIdx]
 			if !c.Inline {
+				// Blank line before this comment if there's a gap.
+				if prevEndLine >= 0 && c.Row-prevEndLine > 1 {
+					lines = append(lines, "")
+				}
 				lines = append(lines, ind+"#"+c.Value)
+				prevEndLine = c.Row
 			}
 			commentIdx++
+		}
+
+		// Preserve a single blank line when the original source had a
+		// gap of 2+ lines. Multiple blank lines collapse into one.
+		if stmtStartLine >= 0 && prevEndLine >= 0 && stmtStartLine-prevEndLine > 1 {
+			lines = append(lines, "")
 		}
 
 		// For resource statements, format with embedded comments.
@@ -632,6 +659,7 @@ func formatProgWithComments(prog *StmtProg, comments []*CommentData, depth int) 
 				commentIdx++
 			}
 			lines = append(lines, formatResWithComments(res, resCmts, depth))
+			prevEndLine = stmtEndLine
 			continue
 		}
 
@@ -651,6 +679,7 @@ func formatProgWithComments(prog *StmtProg, comments []*CommentData, depth int) 
 		for commentIdx < len(comments) && stmtEndLine >= 0 && comments[commentIdx].Row <= stmtEndLine {
 			commentIdx++
 		}
+		prevEndLine = stmtEndLine
 	}
 
 	// Append any trailing comments.
