@@ -106,8 +106,11 @@ func (obj *FmtArgs) Run(ctx context.Context, data *cliUtil.Data) (bool, error) {
 		fmt.Print(formatted)
 	}
 
+	// In list mode, exit with non-zero status if unformatted files were
+	// found. We use os.Exit directly so that no error message is printed
+	// to stdout (the main error handler uses fmt.Println).
 	if obj.List && hasUnformatted {
-		return true, fmt.Errorf("found unformatted files")
+		os.Exit(1)
 	}
 
 	return true, nil

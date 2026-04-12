@@ -35,4 +35,23 @@ bad_files=$(
 if [[ -n "${bad_files}" ]]; then
 	fail_test "The following mcl files are not properly formatted: ${bad_files}"
 fi
+
+# mgmt fmt -l
+find_mcl_files() {
+	git ls-files | grep '\.mcl$' | grep -v 'misc/TODO.mcl'
+}
+
+if [ -x "${MGMT}" ]; then
+	bad_fmt_files=$(
+		for i in $(find_mcl_files); do
+			# use || true to prevent errexit from killing the loop
+			${MGMT} fmt -l "$i" 2>/dev/null || true
+		done
+	)
+	if [[ -n "${bad_fmt_files}" ]]; then
+		fail_test "The following mcl files are not properly formatted (mgmt fmt -l): ${bad_fmt_files}"
+	fi
+else
+	echo "WARNING: mgmt binary not found at ${MGMT}, skipping mgmt fmt check"
+fi
 echo 'PASS'
