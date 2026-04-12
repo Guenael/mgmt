@@ -44,6 +44,16 @@ func fmtIndent(depth int) string {
 	return strings.Repeat("\t", depth)
 }
 
+// extractIndent returns the leading whitespace (tabs) from a string.
+func extractIndent(s string) string {
+	for i, c := range s {
+		if c != '\t' {
+			return s[:i]
+		}
+	}
+	return s
+}
+
 // stmtActualEnd returns the true end line of a statement by walking into child
 // expressions. This is needed because the parser's locate() sometimes only
 // covers the first line of a multi-line statement (e.g., StmtBind's position
@@ -87,8 +97,14 @@ func interleaveComments(formatted string, comments []*CommentData, stmtStartLine
 
 	for fmtIdx < len(fmtLines) {
 		// Emit any standalone comments on this row before the code line.
+		// Use the indentation of the next formatted line so comments
+		// inside nested blocks get the correct depth.
 		for commentIdx < len(comments) && comments[commentIdx].Row == row && !comments[commentIdx].Inline {
-			result = append(result, fmtIndent(depth+1)+"#"+comments[commentIdx].Value)
+			ind := ""
+			if fmtIdx < len(fmtLines) {
+				ind = extractIndent(fmtLines[fmtIdx])
+			}
+			result = append(result, ind+"#"+comments[commentIdx].Value)
 			commentIdx++
 			row++
 		}
@@ -113,7 +129,11 @@ func interleaveComments(formatted string, comments []*CommentData, stmtStartLine
 				result[len(result)-1] += " #" + c.Value
 			}
 		} else {
-			result = append(result, fmtIndent(depth+1)+"#"+c.Value)
+			ind := fmtIndent(depth + 1)
+			if len(result) > 0 {
+				ind = extractIndent(result[len(result)-1])
+			}
+			result = append(result, ind+"#"+c.Value)
 		}
 		commentIdx++
 	}
@@ -580,6 +600,25 @@ func (obj *ExprMap) Format(depth int) string {
 	if len(obj.KVs) == 0 {
 		return "{}"
 	}
+	// Check if the original source used multi-line format.
+	multiLine := false
+	if len(obj.KVs) > 0 && obj.IsSet() {
+		mapRow, _ := obj.Pos()
+		if pn, ok := obj.KVs[0].Key.(interfaces.PositionableNode); ok && pn.IsSet() {
+			elemRow, _ := pn.Pos()
+			if elemRow > mapRow {
+				multiLine = true
+			}
+		}
+	}
+	if multiLine {
+		s := "{\n"
+		for _, kv := range obj.KVs {
+			s += fmtIndent(depth+1) + formatExpr(kv.Key, depth+1) + " => " + formatExpr(kv.Val, depth+1) + ",\n"
+		}
+		s += fmtIndent(depth) + "}"
+		return s
+	}
 	parts := []string{}
 	for _, kv := range obj.KVs {
 		parts = append(parts, formatExpr(kv.Key, 0)+" => "+formatExpr(kv.Val, 0)+",")
@@ -591,6 +630,25 @@ func (obj *ExprMap) Format(depth int) string {
 func (obj *ExprStruct) Format(depth int) string {
 	if len(obj.Fields) == 0 {
 		return "struct{}"
+	}
+	// Check if the original source used multi-line format.
+	multiLine := false
+	if len(obj.Fields) > 0 && obj.IsSet() {
+		structRow, _ := obj.Pos()
+		if pn, ok := obj.Fields[0].Value.(interfaces.PositionableNode); ok && pn.IsSet() {
+			elemRow, _ := pn.Pos()
+			if elemRow > structRow {
+				multiLine = true
+			}
+		}
+	}
+	if multiLine {
+		s := "struct{\n"
+		for _, f := range obj.Fields {
+			s += fmtIndent(depth+1) + f.Name + " => " + formatExpr(f.Value, depth+1) + ",\n"
+		}
+		s += fmtIndent(depth) + "}"
+		return s
 	}
 	parts := []string{}
 	for _, f := range obj.Fields {
@@ -966,26 +1024,18 @@ func formatResWithComments(res *StmtRes, comments []*CommentData, depth int) str
 		}
 		if f, ok := c.(formattable); ok {
 			formatted := f.Format(depth + 1)
-			// Append any inline comments within this content element.
+			// Collect comments within this content element and
+			// interleave them into the formatted output.
 			contentEndLine := -1
 			if pn, ok := c.(interfaces.PositionableNode); ok && pn.IsSet() {
 				contentEndLine, _ = pn.End()
 			}
+			var contentCmts []*CommentData
 			for commentIdx < len(comments) && contentEndLine >= 0 && comments[commentIdx].Row <= contentEndLine {
-				cm := comments[commentIdx]
-				if cm.Inline {
-					// If the comment is on the content's start
-					// line and the formatted output is multi-line,
-					// append to the first line, not the last.
-					if cm.Row == contentStartLine && strings.Contains(formatted, "\n") {
-						fmtLines := strings.SplitN(formatted, "\n", 2)
-						formatted = fmtLines[0] + " #" + cm.Value + "\n" + fmtLines[1]
-					} else {
-						formatted += " #" + cm.Value
-					}
-				}
+				contentCmts = append(contentCmts, comments[commentIdx])
 				commentIdx++
 			}
+			formatted = interleaveComments(formatted, contentCmts, contentStartLine, depth+1)
 			s += formatted + "\n"
 			prevContentEnd = contentEndLine
 		} else {
