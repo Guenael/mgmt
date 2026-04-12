@@ -1,0 +1,17 @@
+-- main.mcl --
+# comment before if
+if true {
+	# comment in if body
+	test "t1" {
+		stringptr => "yes",
+	}
+} else {
+	# comment in else body
+	test "t2" {
+		stringptr => "no",
+	}
+}
+-- OUTPUT --
+Edge: const: bool(true) -> stmtif # condition
+Vertex: const: bool(true)
+Vertex: stmtif

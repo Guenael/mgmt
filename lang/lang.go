@@ -35,9 +35,11 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
+	cliUtil "github.com/purpleidea/mgmt/cli/util"
 	"github.com/purpleidea/mgmt/engine"
 	"github.com/purpleidea/mgmt/engine/local"
 	"github.com/purpleidea/mgmt/lang/ast"
@@ -56,6 +58,28 @@ import (
 	"github.com/purpleidea/mgmt/util"
 	"github.com/purpleidea/mgmt/util/errwrap"
 )
+
+func init() {
+	// Register the MCL formatter for the CLI to use without importing
+	// lang/ast directly (which would create an import cycle).
+	cliUtil.FormatFunc = func(input string) (string, error) {
+		comments, tree, err := parser.LexParseWithComments(strings.NewReader(input))
+		if err != nil {
+			return "", err
+		}
+		// Convert parser.Comment to ast.CommentData to avoid cycles.
+		cmts := make([]*ast.CommentData, len(comments))
+		for i, c := range comments {
+			cmts[i] = &ast.CommentData{
+				Value:  c.Value,
+				Row:    c.Row,
+				Col:    c.Col,
+				Inline: c.Inline,
+			}
+		}
+		return ast.FormatWithComments(tree, cmts) + "\n", nil
+	}
+}
 
 const (
 	// EngineStartupStatsTimeout is the amount of time in seconds to wait

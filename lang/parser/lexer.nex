@@ -347,12 +347,20 @@
 		{	// this matches a (#) pound char followed by any
 			// number of chars that aren't the (\n) newline!
 
-			yylex.pos(lval) // our pos
 			s := yylex.Text()
+			lp := yylex.cast()
 
-			lval.str = s[1:] // remove the leading #
-			//log.Printf("lang: lexer: comment: `%s`", lval.str)
-			//return COMMENT // skip return to avoid parsing
+			// Collect this comment in the side channel for the
+			// formatter to use. We don't return a COMMENT token
+			// because the grammar can't handle comments in all
+			// positions (e.g., inside expression bodies).
+			lp.comments = append(lp.comments, &Comment{
+				Value:  s[1:], // remove the leading #
+				Row:    yylex.Line(),
+				Col:    yylex.Column(),
+				Inline: lp.lastTokenLine == yylex.Line(),
+			})
+			//log.Printf("lang: lexer: comment: `%s`", s[1:])
 		}
 /./		{
 			yylex.pos(lval) // our pos

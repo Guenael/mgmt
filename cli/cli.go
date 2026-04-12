@@ -127,6 +127,8 @@ type Args struct {
 
 	ToolsCmd *ToolsArgs `arg:"subcommand:tools" help:"collection of useful tools"`
 
+	FmtCmd *FmtArgs `arg:"subcommand:fmt" help:"format mcl source code"`
+
 	// This never runs, it gets preempted in the real main() function.
 	// XXX: Can we do it nicely with the new arg parser? can it ignore all args?
 	EtcdCmd *EtcdArgs `arg:"subcommand:etcd" help:"run standalone etcd"`
@@ -179,6 +181,10 @@ func (obj *Args) Run(ctx context.Context, data *cliUtil.Data) (bool, error) {
 	}
 
 	if cmd := obj.ToolsCmd; cmd != nil {
+		return cmd.Run(ctx, data)
+	}
+
+	if cmd := obj.FmtCmd; cmd != nil {
 		return cmd.Run(ctx, data)
 	}
 

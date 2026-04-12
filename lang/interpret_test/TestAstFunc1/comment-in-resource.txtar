@@ -1,0 +1,11 @@
+-- main.mcl --
+test "t1" {
+	# set the string field
+	stringptr => "hello",
+	# set the int field
+	int64ptr => 42,
+}
+-- OUTPUT --
+Vertex: const: int(42)
+Vertex: const: str("hello")
+Vertex: const: str("t1")

@@ -76,6 +76,16 @@ func (e *LexParseErr) Error() string {
 	return fmt.Sprintf("%s: `%s` @%d:%d", e.Err, e.Str, e.Row+1, e.Col+1)
 }
 
+// Comment represents a comment found during lexing. Comments are collected in
+// a side channel rather than being returned as tokens, because the grammar
+// cannot handle comments in all positions (e.g., inside expression bodies).
+type Comment struct {
+	Value  string // the comment text without the leading #
+	Row    int    // 0-based line number
+	Col    int    // 0-based column number
+	Inline bool   // true if comment is on the same line as code
+}
+
 // lexParseAST is a struct which we pass into the lexer/parser so that we have a
 // location to store the AST to avoid having to use a global variable.
 type lexParseAST struct {
@@ -84,13 +94,31 @@ type lexParseAST struct {
 	row int
 	col int
 
+	// lastTokenLine tracks the line number of the last token for which
+	// pos() was called. This is used to detect inline comments (comments
+	// on the same line as code) which we can distinguish from standalone
+	// comments.
+	lastTokenLine int
+
+	// comments is the list of comments found during lexing, collected in
+	// order. These are stored here rather than as tokens because the
+	// grammar cannot handle comments in all positions.
+	comments []*Comment
+
 	lexerErr error // from lexer
 	parseErr error // from Error(e string)
 }
 
 // LexParse runs the lexer/parser machinery and returns the AST.
 func LexParse(input io.Reader) (interfaces.Stmt, error) {
-	lp := &lexParseAST{}
+	_, ast, err := LexParseWithComments(input)
+	return ast, err
+}
+
+// LexParseWithComments runs the lexer/parser machinery and returns both the AST
+// and any comments that were found during lexing.
+func LexParseWithComments(input io.Reader) ([]*Comment, interfaces.Stmt, error) {
+	lp := &lexParseAST{lastTokenLine: -1}
 	// parseResult is a seemingly unused field in the Lexer struct for us...
 	lexer := NewLexerWithInit(input, func(y *Lexer) { y.parseResult = lp })
 	yyParse(lexer) // writes the result to lp.ast
@@ -102,9 +130,9 @@ func LexParse(input io.Reader) (interfaces.Stmt, error) {
 		err = e
 	}
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return lp.ast, nil
+	return lp.comments, lp.ast, nil
 }
 
 // LexParseWithOffsets takes an io.Reader input and a list of corresponding

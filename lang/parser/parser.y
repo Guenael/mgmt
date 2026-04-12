@@ -1157,6 +1157,13 @@ resource_body:
 		posLast(yylex, yyDollar) // our pos
 		$$.resContents = append($1.resContents, $2.resMeta)
 	}
+|	resource_body COMMENT
+	{
+		posLast(yylex, yyDollar) // our pos
+		$$.resContents = append($1.resContents, &ast.StmtResComment{
+			Value: $2.str,
+		})
+	}
 ;
 resource_field:
 	IDENTIFIER ROCKET expr COMMA
@@ -1630,6 +1637,9 @@ func (yylex *Lexer) pos(lval *yySymType) {
 	} else {
 		lval.endCol = lval.col + len(text) // moved over this many chars
 	}
+
+	lp := yylex.cast()
+	lp.lastTokenLine = lval.row
 }
 
 // Error is the error handler which gets called on a parsing error.

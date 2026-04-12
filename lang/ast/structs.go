@@ -1600,6 +1600,79 @@ type StmtResContents interface {
 	Graph(env *interfaces.Env) (*pgraph.Graph, error)
 }
 
+// StmtResComment represents a comment inside a resource body. It implements the
+// StmtResContents interface so that comments can be preserved in the AST for
+// eventual use by a code formatter, but it produces no output.
+type StmtResComment struct {
+	interfaces.Textarea
+
+	Value string
+}
+
+// String returns a short representation of this statement.
+func (obj *StmtResComment) String() string {
+	return fmt.Sprintf("rescomment(%s)", obj.Value)
+}
+
+// Apply is a general purpose iterator method that operates on any AST node. It
+// is not used as the primary AST traversal function because it is less readable
+// and easy to reason about than manually implementing traversal for each node.
+// Nevertheless, it is a useful facility for operations that might only apply to
+// a select number of node types, since they won't need extra noop iterators...
+func (obj *StmtResComment) Apply(fn func(interfaces.Node) error) error { return fn(obj) }
+
+// Init initializes this branch of the AST, and returns an error if it fails to
+// validate.
+func (obj *StmtResComment) Init(data *interfaces.Data) error {
+	obj.Textarea.Setup(data)
+	return nil
+}
+
+// Interpolate returns a new node (aka a copy) once it has been expanded. This
+// generally increases the size of the AST when it is used. It calls Interpolate
+// on any child elements and builds the new node with those new node contents.
+// Here it simply returns itself, as no interpolation is possible.
+func (obj *StmtResComment) Interpolate() (StmtResContents, error) {
+	return &StmtResComment{
+		Value: obj.Value,
+	}, nil
+}
+
+// Copy returns a light copy of this struct. Anything static will not be copied.
+func (obj *StmtResComment) Copy() (StmtResContents, error) {
+	return obj, nil // always static
+}
+
+// Ordering returns a graph of the scope ordering that represents the data flow.
+// This can be used in SetScope so that it knows the correct order to run it in.
+func (obj *StmtResComment) Ordering(produces map[string]interfaces.Node) (*pgraph.Graph, map[interfaces.Node]string, error) {
+	graph, err := pgraph.NewGraph("ordering")
+	if err != nil {
+		return nil, nil, err
+	}
+	graph.AddVertex(obj)
+
+	cons := make(map[interfaces.Node]string)
+	return graph, cons, nil
+}
+
+// SetScope does nothing for this struct, because it has no child nodes, and it
+// does not need to know about the parent scope.
+func (obj *StmtResComment) SetScope(*interfaces.Scope) error { return nil }
+
+// TypeCheck returns the list of invariants that this node produces. It does so
+// recursively on any children elements that exist in the AST, and returns the
+// collection to the caller.
+func (obj *StmtResComment) TypeCheck(kind string) ([]*interfaces.UnificationInvariant, error) {
+	return []*interfaces.UnificationInvariant{}, nil
+}
+
+// Graph returns the reactive function graph which is expressed by this node.
+// This particular graph does nothing as comments produce no reactive output.
+func (obj *StmtResComment) Graph(*interfaces.Env) (*pgraph.Graph, error) {
+	return pgraph.NewGraph("rescomment")
+}
+
 // StmtResField represents a single field in the parsed resource representation.
 // This does not satisfy the Stmt interface.
 type StmtResField struct {

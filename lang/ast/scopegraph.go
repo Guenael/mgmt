@@ -117,6 +117,11 @@ func (obj *StmtComment) ScopeGraph(g *pgraph.Graph) {
 }
 
 // ScopeGraph adds nodes and vertices to the supplied graph.
+func (obj *StmtResComment) ScopeGraph(g *pgraph.Graph) {
+	g.AddVertex(obj)
+}
+
+// ScopeGraph adds nodes and vertices to the supplied graph.
 func (obj *ExprBool) ScopeGraph(g *pgraph.Graph) {
 	g.AddVertex(obj)
 }

@@ -69,6 +69,12 @@ func LookupSubcommand(obj interface{}, st interface{}) string {
 	return "" // not found
 }
 
+// FormatFunc is a function variable that formats MCL source code. It takes
+// raw MCL source as input and returns the canonically formatted version.
+// It is registered by the lang/ast package at init time to avoid import
+// cycles between the cli and lang packages.
+var FormatFunc func(input string) (string, error)
+
 // EmptyArgs is the empty CLI parsing structure and type of the parsed result.
 type EmptyArgs struct {
 	Wait bool `arg:"--wait" help:"don't use any existing (stale) deploys"`
