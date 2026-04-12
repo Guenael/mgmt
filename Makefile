@@ -305,7 +305,7 @@ yamlfmt:
 	find . -maxdepth 3 -type f -name '*.yaml' -not -path './old/*' -not -path './tmp/*' -not -path './omv.yaml' -exec ruby -e "require 'yaml'; x=YAML.load_file('{}').to_yaml.each_line.map(&:rstrip).join(10.chr)+10.chr; File.open('{}', 'w').write x" \;
 
 mclfmt:
-	find . -maxdepth 9 -type f -name '*.mcl' -not -path './old/*' -not -path './tmp/*' -exec ./$(PROGRAM) fmt -w {} \;
+	find . -maxdepth 9 -type f -name '*.mcl' -not -path './old/*' -not -path './tmp/*' -print0 | xargs -0 ./$(PROGRAM) fmt -w
 
 format: gofmt yamlfmt mclfmt ## format yaml, golang, and mcl code
 

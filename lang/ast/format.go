@@ -227,21 +227,7 @@ func formatCallArgs(args []interfaces.Expr) string {
 // Format returns the canonically formatted MCL source for this program.
 func (obj *StmtProg) Format(depth int) string {
 	lines := []string{}
-	// Initialize prevEndLine to the prog's start row if it's close to the
-	// first statement. This preserves blank lines at the start of block
-	// bodies and keeps interleaveComments row counting in sync. We skip
-	// this if the gap is too large (parser positioning artifact for else
-	// branches where Pos() returns the if keyword's position).
 	prevEndLine := -1
-	if obj.IsSet() && len(obj.Body) > 0 {
-		progRow, _ := obj.Pos()
-		if pn, ok := obj.Body[0].(interfaces.PositionableNode); ok && pn.IsSet() {
-			firstRow, _ := pn.Pos()
-			if firstRow-progRow <= 2 {
-				prevEndLine = progRow
-			}
-		}
-	}
 	for _, stmt := range obj.Body {
 		// Preserve a single blank line between statements when the
 		// original source had a gap of 2+ lines. Multiple blank lines
@@ -580,6 +566,14 @@ func (obj *ExprFloat) Format(depth int) string {
 // Format returns the canonically formatted MCL source for this list.
 func (obj *ExprList) Format(depth int) string {
 	if len(obj.Elements) == 0 {
+		// Preserve multi-line empty lists.
+		if obj.IsSet() {
+			startRow, _ := obj.Pos()
+			endRow, _ := obj.End()
+			if endRow > startRow {
+				return "[\n" + fmtIndent(depth) + "]"
+			}
+		}
 		return "[]"
 	}
 	// Check if the original source used multi-line format.
@@ -899,6 +893,19 @@ func formatProgWithComments(prog *StmtProg, comments []*CommentData, depth int) 
 			lines = append(lines, "")
 		}
 
+		// For if statements, format with comment-aware sub-progs.
+		if ifStmt, ok := stmt.(*StmtIf); ok {
+			stmtEndLine := stmtActualEnd(stmt)
+			var ifCmts []*CommentData
+			for commentIdx < len(comments) && stmtEndLine >= 0 && comments[commentIdx].Row <= stmtEndLine {
+				ifCmts = append(ifCmts, comments[commentIdx])
+				commentIdx++
+			}
+			lines = append(lines, formatIfWithComments(ifStmt, ifCmts, depth))
+			prevEndLine = stmtEndLine
+			continue
+		}
+
 		// For resource statements, format with embedded comments.
 		if res, ok := stmt.(*StmtRes); ok {
 			stmtEndLine := -1
@@ -963,30 +970,56 @@ func formatResWithComments(res *StmtRes, comments []*CommentData, depth int) str
 	}
 	s := ind + prefix + res.Kind + " " + formatExpr(res.Name, depth) + " {"
 
-	// Append any inline comment on the resource declaration line.
 	resStartLine := -1
 	if res.IsSet() {
 		resStartLine, _ = res.Pos()
 	}
 	commentIdx := 0
+
+	// Count real content elements (excluding synthetic StmtResCollect).
+	realContents := 0
+	for _, c := range res.Contents {
+		if _, ok := c.(*StmtResCollect); !ok {
+			realContents++
+		}
+	}
+	// Check for empty resource bodies (no real content, only synthetic
+	// StmtResCollect). Handle inline comments on the declaration line
+	// after the closing brace.
+	hasBodyComments := false
+	for _, c := range comments[commentIdx:] {
+		if !c.Inline || (resStartLine >= 0 && c.Row != resStartLine) {
+			hasBodyComments = true
+			break
+		}
+	}
+	if realContents == 0 && !hasBodyComments {
+		if res.IsSet() {
+			startRow, _ := res.Pos()
+			endRow, _ := res.End()
+			if endRow > startRow {
+				s += "\n" + ind + "}"
+			} else {
+				s += "}"
+			}
+		} else {
+			s += "}"
+		}
+		// Append any inline comments after the closing brace.
+		for _, c := range comments[commentIdx:] {
+			if c.Inline {
+				s += " #" + c.Value
+			}
+		}
+		return s
+	}
+
+	// Append any inline comment on the resource declaration line.
 	for commentIdx < len(comments) && resStartLine >= 0 && comments[commentIdx].Row == resStartLine {
 		if comments[commentIdx].Inline {
 			s += " #" + comments[commentIdx].Value
 		}
 		commentIdx++
-	}
-
-	if len(res.Contents) == 0 && commentIdx >= len(comments) {
-		// Preserve multi-line empty body if the original had { and }
-		// on different lines.
-		if res.IsSet() {
-			startRow, _ := res.Pos()
-			endRow, _ := res.End()
-			if endRow > startRow {
-				return s + "\n" + ind + "}"
-			}
-		}
-		return s + "}"
 	}
 	s += "\n"
 	lastSection := -1
@@ -1000,6 +1033,12 @@ func formatResWithComments(res *StmtRes, comments []*CommentData, depth int) str
 		}
 	}
 	for _, c := range res.Contents {
+		// Skip synthetic nodes like StmtResCollect which have no
+		// position data and no Format method.
+		if _, ok := c.(*StmtResCollect); ok {
+			continue
+		}
+
 		// Get the original start line of this content element.
 		contentStartLine := -1
 		if pn, ok := c.(interfaces.PositionableNode); ok && pn.IsSet() {
@@ -1082,5 +1121,80 @@ func formatResWithComments(res *StmtRes, comments []*CommentData, depth int) str
 	}
 
 	s += ind + "}"
+	return s
+}
+
+// formatIfWithComments formats an if statement, distributing comments to the
+// then and else branches so they can be properly placed within nested
+// resources and sub-progs.
+func formatIfWithComments(ifStmt *StmtIf, comments []*CommentData, depth int) string {
+	ind := fmtIndent(depth)
+
+	// Detect the panic desugaring pattern.
+	if ifStmt.ElseBranch == nil && ifStmt.ThenBranch != nil {
+		if res, ok := ifStmt.ThenBranch.(*StmtRes); ok && res.Kind == interfaces.PanicResKind {
+			if call, ok := ifStmt.Condition.(*ExprCall); ok {
+				name := call.Name
+				if name == funcs.PanicFuncName || name == funcs.PanicDebugFuncName {
+					s := ind + "panic(" + formatCallArgs(call.Args) + ")"
+					for _, c := range comments {
+						if c.Inline {
+							s += " #" + c.Value
+						}
+					}
+					return s
+				}
+			}
+		}
+	}
+
+	s := ind + "if " + formatExpr(ifStmt.Condition, depth) + " {\n"
+
+	// Split comments into then-branch and else-branch based on positions.
+	thenEnd := -1
+	if ifStmt.ThenBranch != nil {
+		if pn, ok := ifStmt.ThenBranch.(interfaces.PositionableNode); ok && pn.IsSet() {
+			thenEnd, _ = pn.End()
+		}
+	}
+
+	var thenCmts, elseCmts []*CommentData
+	for _, c := range comments {
+		if thenEnd >= 0 && c.Row <= thenEnd {
+			thenCmts = append(thenCmts, c)
+		} else {
+			elseCmts = append(elseCmts, c)
+		}
+	}
+
+	if ifStmt.ThenBranch != nil {
+		if prog, ok := ifStmt.ThenBranch.(*StmtProg); ok {
+			s += formatProgWithComments(prog, thenCmts, depth+1) + "\n"
+		} else {
+			type formattable interface {
+				Format(depth int) string
+			}
+			if f, ok := ifStmt.ThenBranch.(formattable); ok {
+				s += f.Format(depth+1) + "\n"
+			}
+		}
+	}
+
+	if ifStmt.ElseBranch != nil {
+		s += ind + "} else {\n"
+		if prog, ok := ifStmt.ElseBranch.(*StmtProg); ok {
+			s += formatProgWithComments(prog, elseCmts, depth+1) + "\n"
+		} else {
+			type formattable interface {
+				Format(depth int) string
+			}
+			if f, ok := ifStmt.ElseBranch.(formattable); ok {
+				s += f.Format(depth+1) + "\n"
+			}
+		}
+		s += ind + "}"
+	} else {
+		s += ind + "}"
+	}
 	return s
 }

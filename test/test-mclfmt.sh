@@ -42,12 +42,7 @@ find_mcl_files() {
 }
 
 if [ -x "${MGMT}" ]; then
-	bad_fmt_files=$(
-		for i in $(find_mcl_files); do
-			# use || true to prevent errexit from killing the loop
-			${MGMT} fmt -l "$i" 2>/dev/null || true
-		done
-	)
+	bad_fmt_files=$(find_mcl_files | xargs ${MGMT} fmt -l 2>/dev/null || true)
 	if [[ -n "${bad_fmt_files}" ]]; then
 		fail_test "The following mcl files are not properly formatted (mgmt fmt -l): ${bad_fmt_files}"
 	fi

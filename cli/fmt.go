@@ -42,8 +42,8 @@ import (
 // FmtArgs is the CLI parsing structure and type of the parsed result for the
 // `fmt` subcommand.
 type FmtArgs struct {
-	// Input is the input mcl file or directory path to format.
-	Input string `arg:"positional,required" help:"input mcl file or directory path"`
+	// Inputs is the list of input mcl files or directory paths to format.
+	Inputs []string `arg:"positional,required" help:"input mcl file(s) or directory path(s)"`
 
 	// Write causes the formatted output to be written back to the source
 	// file(s) instead of being printed to stdout.
@@ -55,27 +55,28 @@ type FmtArgs struct {
 
 // Run executes the fmt subcommand.
 func (obj *FmtArgs) Run(ctx context.Context, data *cliUtil.Data) (bool, error) {
-	info, err := os.Stat(obj.Input)
-	if err != nil {
-		return true, fmt.Errorf("cannot access input: %s", err)
-	}
-
 	var files []string
-	if info.IsDir() {
-		err := filepath.Walk(obj.Input, func(path string, fi os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
-			if !fi.IsDir() && strings.HasSuffix(path, ".mcl") {
-				files = append(files, path)
-			}
-			return nil
-		})
+	for _, input := range obj.Inputs {
+		info, err := os.Stat(input)
 		if err != nil {
-			return true, err
+			return true, fmt.Errorf("cannot access input: %s", err)
 		}
-	} else {
-		files = []string{obj.Input}
+		if info.IsDir() {
+			err := filepath.Walk(input, func(path string, fi os.FileInfo, err error) error {
+				if err != nil {
+					return err
+				}
+				if !fi.IsDir() && strings.HasSuffix(path, ".mcl") {
+					files = append(files, path)
+				}
+				return nil
+			})
+			if err != nil {
+				return true, err
+			}
+		} else {
+			files = append(files, input)
+		}
 	}
 
 	hasUnformatted := false
