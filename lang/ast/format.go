@@ -157,17 +157,18 @@ func (obj *StmtBind) Format(depth int) string {
 }
 
 // resContentSection classifies a resource content element into one of three
-// sections: 0=field, 1=meta, 2=edge. Comments return -1 (no section change).
+// sections: 0=field, 1=meta, 2=edge. Comments and internal synthetic nodes
+// (like StmtResCollect) return -1 to avoid triggering section changes.
 func resContentSection(c StmtResContents) int {
 	switch c.(type) {
 	case *StmtResMeta:
 		return 1
 	case *StmtResEdge:
 		return 2
-	case *StmtResComment:
-		return -1 // comments don't trigger section changes
+	case *StmtResField:
+		return 0
 	default:
-		return 0 // StmtResField and anything else
+		return -1 // comments, StmtResCollect, etc.
 	}
 }
 
@@ -497,7 +498,23 @@ func (obj *ExprFunc) Format(depth int) string {
 	if obj.Return != nil {
 		s += " " + obj.Return.String()
 	}
-	s += " { " + formatExpr(obj.Body, 0) + " }"
+	// Check if the original source used multi-line format by comparing
+	// the function's start line with the body expression's start line.
+	multiLine := false
+	if pn, ok := obj.Body.(interfaces.PositionableNode); ok && pn.IsSet() && obj.IsSet() {
+		funcRow, _ := obj.Pos()
+		bodyRow, _ := pn.Pos()
+		if bodyRow > funcRow {
+			multiLine = true
+		}
+	}
+	if multiLine {
+		s += " {\n"
+		s += fmtIndent(depth+1) + formatExpr(obj.Body, depth+1) + "\n"
+		s += fmtIndent(depth) + "}"
+	} else {
+		s += " { " + formatExpr(obj.Body, 0) + " }"
+	}
 	return s
 }
 
