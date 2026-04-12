@@ -44,6 +44,83 @@ func fmtIndent(depth int) string {
 	return strings.Repeat("\t", depth)
 }
 
+// stmtActualEnd returns the true end line of a statement by walking into child
+// expressions. This is needed because the parser's locate() sometimes only
+// covers the first line of a multi-line statement (e.g., StmtBind's position
+// may not include a multi-line ExprIf value).
+func stmtActualEnd(stmt interfaces.Stmt) int {
+	endLine := -1
+	if pn, ok := stmt.(interfaces.PositionableNode); ok && pn.IsSet() {
+		endLine, _ = pn.End()
+	}
+	// For StmtBind, also check the Value expression's end.
+	if bind, ok := stmt.(*StmtBind); ok && bind.Value != nil {
+		if pn, ok := bind.Value.(interfaces.PositionableNode); ok && pn.IsSet() {
+			valEnd, _ := pn.End()
+			if valEnd > endLine {
+				endLine = valEnd
+			}
+		}
+	}
+	return endLine
+}
+
+// interleaveComments takes a formatted multi-line string and injects comments
+// into it. Comments are matched to formatted output lines by walking through
+// original source rows and formatted lines in parallel: each formatted line
+// corresponds to an original source row, and standalone comments occupy rows
+// that have no corresponding formatted line. Inline comments are appended to
+// the formatted line whose original row matches.
+func interleaveComments(formatted string, comments []*CommentData, stmtStartLine int, depth int) string {
+	if len(comments) == 0 {
+		return formatted
+	}
+
+	fmtLines := strings.Split(formatted, "\n")
+
+	// Walk original source rows from stmtStartLine, consuming formatted
+	// lines for code rows and inserting comment lines for comment rows.
+	var result []string
+	fmtIdx := 0
+	commentIdx := 0
+	row := stmtStartLine
+
+	for fmtIdx < len(fmtLines) {
+		// Emit any standalone comments on this row before the code line.
+		for commentIdx < len(comments) && comments[commentIdx].Row == row && !comments[commentIdx].Inline {
+			result = append(result, fmtIndent(depth+1)+"#"+comments[commentIdx].Value)
+			commentIdx++
+			row++
+		}
+
+		// Emit the formatted code line, with any inline comments.
+		line := fmtLines[fmtIdx]
+		for commentIdx < len(comments) && comments[commentIdx].Row == row && comments[commentIdx].Inline {
+			line += " #" + comments[commentIdx].Value
+			commentIdx++
+		}
+		result = append(result, line)
+		fmtIdx++
+		row++
+	}
+
+	// Any remaining comments go at the end.
+	for commentIdx < len(comments) {
+		c := comments[commentIdx]
+		if c.Inline {
+			// Attach to last line if possible.
+			if len(result) > 0 {
+				result[len(result)-1] += " #" + c.Value
+			}
+		} else {
+			result = append(result, fmtIndent(depth+1)+"#"+c.Value)
+		}
+		commentIdx++
+	}
+
+	return strings.Join(result, "\n")
+}
+
 // operatorPrecedence returns the precedence level for an operator string. Higher
 // values mean higher precedence (tighter binding). This must match the
 // precedence table in parser.y.
@@ -520,6 +597,25 @@ func (obj *ExprFunc) Format(depth int) string {
 
 // Format returns the canonically formatted MCL source for this if expression.
 func (obj *ExprIf) Format(depth int) string {
+	// Check if the original source used multi-line format.
+	multiLine := false
+	if pn, ok := obj.ThenBranch.(interfaces.PositionableNode); ok && pn.IsSet() && obj.IsSet() {
+		ifRow, _ := obj.Pos()
+		thenRow, _ := pn.Pos()
+		if thenRow > ifRow {
+			multiLine = true
+		}
+	}
+
+	if multiLine {
+		s := "if " + formatExpr(obj.Condition, 0) + " {\n"
+		s += fmtIndent(depth+1) + formatExpr(obj.ThenBranch, depth+1) + "\n"
+		s += fmtIndent(depth) + "} else {\n"
+		s += fmtIndent(depth+1) + formatExpr(obj.ElseBranch, depth+1) + "\n"
+		s += fmtIndent(depth) + "}"
+		return s
+	}
+
 	s := "if " + formatExpr(obj.Condition, 0)
 	s += " { " + formatExpr(obj.ThenBranch, 0) + " }"
 	s += " else"
@@ -713,18 +809,16 @@ func formatProgWithComments(prog *StmtProg, comments []*CommentData, depth int) 
 		}
 		if f, ok := stmt.(formattable); ok {
 			formatted := f.Format(depth)
-			// Append any inline comments on lines covered by this stmt.
-			stmtEndLine := -1
-			if pn, ok := stmt.(interfaces.PositionableNode); ok && pn.IsSet() {
-				stmtEndLine, _ = pn.End()
-			}
+			// Collect comments that fall within this statement. Use
+			// stmtActualEnd which walks child nodes to find the true
+			// end line (e.g., StmtBind containing multi-line ExprIf).
+			stmtEndLine := stmtActualEnd(stmt)
+			var stmtCmts []*CommentData
 			for commentIdx < len(comments) && stmtEndLine >= 0 && comments[commentIdx].Row <= stmtEndLine {
-				cm := comments[commentIdx]
-				if cm.Inline {
-					formatted += " #" + cm.Value
-				}
+				stmtCmts = append(stmtCmts, comments[commentIdx])
 				commentIdx++
 			}
+			formatted = interleaveComments(formatted, stmtCmts, stmtStartLine, depth)
 			lines = append(lines, formatted)
 			prevEndLine = stmtEndLine
 		}
