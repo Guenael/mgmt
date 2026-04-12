@@ -497,9 +497,9 @@ func (obj *StmtResEdge) Format(depth int) string {
 func (obj *StmtResMeta) Format(depth int) string {
 	ind := fmtIndent(depth)
 	if obj.Condition != nil {
-		return ind + "Meta:" + obj.Property + " => " + formatExpr(obj.Condition, 0) + " ?: " + formatExpr(obj.MetaExpr, 0) + ","
+		return ind + "Meta:" + obj.Property + " => " + formatExpr(obj.Condition, depth) + " ?: " + formatExpr(obj.MetaExpr, depth) + ","
 	}
-	return ind + "Meta:" + obj.Property + " => " + formatExpr(obj.MetaExpr, 0) + ","
+	return ind + "Meta:" + obj.Property + " => " + formatExpr(obj.MetaExpr, depth) + ","
 }
 
 // Format returns the canonically formatted MCL source for this resource comment.
