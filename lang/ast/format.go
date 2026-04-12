@@ -695,18 +695,22 @@ func formatProgWithComments(prog *StmtProg, comments []*CommentData, depth int) 
 			Format(depth int) string
 		}
 		if f, ok := stmt.(formattable); ok {
-			lines = append(lines, f.Format(depth))
+			formatted := f.Format(depth)
+			// Append any inline comments on lines covered by this stmt.
+			stmtEndLine := -1
+			if pn, ok := stmt.(interfaces.PositionableNode); ok && pn.IsSet() {
+				stmtEndLine, _ = pn.End()
+			}
+			for commentIdx < len(comments) && stmtEndLine >= 0 && comments[commentIdx].Row <= stmtEndLine {
+				cm := comments[commentIdx]
+				if cm.Inline {
+					formatted += " #" + cm.Value
+				}
+				commentIdx++
+			}
+			lines = append(lines, formatted)
+			prevEndLine = stmtEndLine
 		}
-
-		// Skip past any comments that are on lines covered by this stmt.
-		stmtEndLine := -1
-		if pn, ok := stmt.(interfaces.PositionableNode); ok && pn.IsSet() {
-			stmtEndLine, _ = pn.End()
-		}
-		for commentIdx < len(comments) && stmtEndLine >= 0 && comments[commentIdx].Row <= stmtEndLine {
-			commentIdx++
-		}
-		prevEndLine = stmtEndLine
 	}
 
 	// Append any trailing comments.
@@ -768,16 +772,29 @@ func formatResWithComments(res *StmtRes, comments []*CommentData, depth int) str
 			Format(depth int) string
 		}
 		if f, ok := c.(formattable); ok {
-			s += f.Format(depth+1) + "\n"
-		}
-
-		// Skip past comments covered by this content element.
-		contentEndLine := -1
-		if pn, ok := c.(interfaces.PositionableNode); ok && pn.IsSet() {
-			contentEndLine, _ = pn.End()
-		}
-		for commentIdx < len(comments) && contentEndLine >= 0 && comments[commentIdx].Row <= contentEndLine {
-			commentIdx++
+			formatted := f.Format(depth + 1)
+			// Append any inline comment on the same line.
+			contentEndLine := -1
+			if pn, ok := c.(interfaces.PositionableNode); ok && pn.IsSet() {
+				contentEndLine, _ = pn.End()
+			}
+			for commentIdx < len(comments) && contentEndLine >= 0 && comments[commentIdx].Row <= contentEndLine {
+				cm := comments[commentIdx]
+				if cm.Inline {
+					formatted += " #" + cm.Value
+				}
+				commentIdx++
+			}
+			s += formatted + "\n"
+		} else {
+			// Skip past comments covered by this content element.
+			contentEndLine := -1
+			if pn, ok := c.(interfaces.PositionableNode); ok && pn.IsSet() {
+				contentEndLine, _ = pn.End()
+			}
+			for commentIdx < len(comments) && contentEndLine >= 0 && comments[commentIdx].Row <= contentEndLine {
+				commentIdx++
+			}
 		}
 	}
 
