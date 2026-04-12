@@ -16,7 +16,7 @@ http:server:flag "/flag1" {
 	key => "key",
 }
 value "value1" {
-	any => "tmp",	# can be any type
+	any => "tmp", # can be any type
 }
 print "print1" {
 	Meta:autogroup => false,
@@ -25,7 +25,7 @@ print "print1" {
 Http:Server:Flag["/flag1"].value -> Print["print1"].msg
 Http:Server:Flag["/flag1"].value -> Value["value1"].any
 
-$ret = value.get_str("value1")	# name of value resource
+$ret = value.get_str("value1") # name of value resource
 $val = $ret->value
 test "get" {
 	anotherstr => $val,

@@ -42,5 +42,5 @@ http:server:file "/file1" {
 http:server:file "/secret/folder/" {
 	path => "${root}",
 
-	Depend => File["${root}"],	# TODO: add autoedges
+	Depend => File["${root}"], # TODO: add autoedges
 }

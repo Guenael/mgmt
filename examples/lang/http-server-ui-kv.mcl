@@ -35,7 +35,7 @@ http:server:ui:input $range1_id {
 #kv $text1_id { # store in world
 #}
 
-$ret1 = world.getval($text1_id)	# name of kv resource
+$ret1 = world.getval($text1_id) # name of kv resource
 
 test "get1" {
 	anotherstr => $ret1->value,
