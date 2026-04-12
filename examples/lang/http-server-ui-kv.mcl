@@ -1,6 +1,6 @@
 import "world"
 
-http:server ":8080" {	# by default http uses :80 but using :8080 avoids needing root!
+http:server ":8080" { # by default http uses :80 but using :8080 avoids needing root!
 	#address => ":8080",	# you can override the name like this
 }
 
