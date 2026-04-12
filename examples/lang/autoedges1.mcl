@@ -1,6 +1,6 @@
 $noop = false
 pkg "drbd-utils" {
-	state => "installed",
+	state => "installed", # this is a comment
 
 	Meta:autoedge => true,
 	Meta:noop => $noop,
@@ -10,15 +10,22 @@ file "/etc/drbd.conf" {
 	content => "this is an mgmt test",
 	state => $const.res.file.state.exists,
 
+	# This is another comment.
 	Meta:autoedge => true,
 	Meta:noop => $noop,
+
+	Before => Svc["drbd"],
+	Depend => Pkg["drbd-utils"],
 }
 
 file "/etc/drbd.d/" {
+	# This comment is about params.
 	state => $const.res.file.state.exists,
 
 	Meta:autoedge => true,
 	Meta:noop => $noop,
+
+	Before => Svc["drbd"],
 }
 
 # note that the autoedges between the files and the svc don't exist yet :(
