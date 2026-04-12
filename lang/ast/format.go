@@ -156,6 +156,21 @@ func (obj *StmtBind) Format(depth int) string {
 	return prefix + " = " + formatExpr(obj.Value, depth)
 }
 
+// resContentSection classifies a resource content element into one of three
+// sections: 0=field, 1=meta, 2=edge. Comments return -1 (no section change).
+func resContentSection(c StmtResContents) int {
+	switch c.(type) {
+	case *StmtResMeta:
+		return 1
+	case *StmtResEdge:
+		return 2
+	case *StmtResComment:
+		return -1 // comments don't trigger section changes
+	default:
+		return 0 // StmtResField and anything else
+	}
+}
+
 // Format returns the canonically formatted MCL source for this resource.
 func (obj *StmtRes) Format(depth int) string {
 	ind := fmtIndent(depth)
@@ -168,7 +183,17 @@ func (obj *StmtRes) Format(depth int) string {
 		return s + "}"
 	}
 	s += "\n"
+	lastSection := -1
 	for _, c := range obj.Contents {
+		// Insert blank line between field/meta/edge sections.
+		sec := resContentSection(c)
+		if sec >= 0 && lastSection >= 0 && sec != lastSection {
+			s += "\n"
+		}
+		if sec >= 0 {
+			lastSection = sec
+		}
+
 		type formattable interface {
 			Format(depth int) string
 		}
@@ -367,11 +392,13 @@ func (obj *StmtResField) Format(depth int) string {
 // Format returns the canonically formatted MCL source for this resource edge.
 func (obj *StmtResEdge) Format(depth int) string {
 	ind := fmtIndent(depth)
+	// Property is stored lowercase by the lexer but written capitalized.
+	prop := strings.Title(obj.Property)
 	ehStr := obj.EdgeHalf.Format(0)
 	if obj.Condition != nil {
-		return ind + obj.Property + " => " + formatExpr(obj.Condition, 0) + " ?: " + ehStr + ","
+		return ind + prop + " => " + formatExpr(obj.Condition, 0) + " ?: " + ehStr + ","
 	}
-	return ind + obj.Property + " => " + ehStr + ","
+	return ind + prop + " => " + ehStr + ","
 }
 
 // Format returns the canonically formatted MCL source for this resource meta.
@@ -709,12 +736,19 @@ func formatResWithComments(res *StmtRes, comments []*CommentData, depth int) str
 	s += "\n"
 
 	commentIdx := 0
+	lastSection := -1
 	for _, c := range res.Contents {
 		// Get the original start line of this content element.
 		contentStartLine := -1
 		if pn, ok := c.(interfaces.PositionableNode); ok && pn.IsSet() {
 			row, _ := pn.Pos()
 			contentStartLine = row
+		}
+
+		// Insert blank line between field/meta/edge sections.
+		sec := resContentSection(c)
+		if sec >= 0 && lastSection >= 0 && sec != lastSection {
+			s += "\n"
 		}
 
 		// Insert comments that come before this content element.
@@ -724,6 +758,10 @@ func formatResWithComments(res *StmtRes, comments []*CommentData, depth int) str
 				s += fmtIndent(depth+1) + "#" + cm.Value + "\n"
 			}
 			commentIdx++
+		}
+
+		if sec >= 0 {
+			lastSection = sec
 		}
 
 		type formattable interface {

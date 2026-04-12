@@ -121,15 +121,17 @@ func TestFormatResource(t *testing.T) {
 }`,
 		},
 		{
-			name: "resource with meta",
+			name: "resource with meta gets blank line",
 			input: `test "t1" {
 	stringptr => "hello",
 	Meta:noop => true,
 }`,
-			expect: `test "t1" {
-	stringptr => "hello",
-	Meta:noop => true,
-}`,
+			expect: "test \"t1\" {\n\tstringptr => \"hello\",\n\n\tMeta:noop => true,\n}",
+		},
+		{
+			name: "resource with fields meta and edges",
+			input: "file \"/tmp/x\" {\n\tcontent => \"hi\",\n\tMeta:autoedge => true,\n\tBefore => Svc[\"nginx\"],\n}",
+			expect: "file \"/tmp/x\" {\n\tcontent => \"hi\",\n\n\tMeta:autoedge => true,\n\n\tBefore => Svc[\"nginx\"],\n}",
 		},
 	}
 	for _, tt := range tests {
