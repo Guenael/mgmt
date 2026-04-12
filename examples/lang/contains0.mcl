@@ -16,11 +16,13 @@ file "/tmp/mgmt/contains" {
 }
 
 $x = if sys.hostname() in ["h1", "h3",] {
+	# this is a valid comment
 	fmt.printf("i (%s) am one of the chosen few!\n", sys.hostname())
-} else {
-	fmt.printf("i (%s) was not chosen :(\n", sys.hostname())
+} else { # this is also a valid comment
+	fmt.printf("i (%s) was not chosen :(\n", sys.hostname()) # this is a third valid comment
 }
 
+# valid comment
 $host = sys.hostname()
 file "/tmp/mgmt/hello-${host}" {
 	state => $const.res.file.state.exists,
